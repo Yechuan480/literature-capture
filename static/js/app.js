@@ -23,6 +23,8 @@
     preboxIndex: -1,
     preboxToken: 0,
     preboxScanning: false,
+    // Global unextracted marks across all papers
+    pendingGlobal: { total: 0, papers: [], items: [] },
   };
 
   const $ = (id) => document.getElementById(id);
@@ -588,10 +590,17 @@
         p.mtime?.slice(0, 10) || ""
       }`;
       const badge = li.querySelector(".paper-badge");
+      const pending = Number(p.pending_extract) || 0;
       if (count > 0) {
         badge.classList.add("done");
-        badge.title = `已截取 ${count} 张表格`;
-        badge.innerHTML = `<span class="check">✓</span><span class="count">${count}</span>`;
+        if (pending > 0) {
+          badge.classList.add("pending-extract");
+          badge.title = `已标记 ${count} 处 · ${pending} 待提取`;
+          badge.innerHTML = `<span class="count">${count}</span><span class="pend">/${pending}</span>`;
+        } else {
+          badge.title = `已标记 ${count} 处（均已提取）`;
+          badge.innerHTML = `<span class="check">✓</span><span class="count">${count}</span>`;
+        }
       } else if (p.no_tables) {
         badge.classList.add("none");
         badge.title = "已标记：无表格";
@@ -631,11 +640,26 @@
 
   function bumpPaperCaptureCount(filename, absoluteCount) {
     const patch = { no_tables: false };
+    const p = state.papers.find((x) => x.filename === filename);
     if (typeof absoluteCount === "number") {
       patch.capture_count = absoluteCount;
     } else {
-      const p = state.papers.find((x) => x.filename === filename);
       patch.capture_count = (Number(p?.capture_count) || 0) + 1;
+    }
+    // Prefer global queue count for this paper if available
+    const bySlug = state.paperSlug
+      ? (state.pendingGlobal.papers || []).find(
+          (x) => x.paper_slug === state.paperSlug
+        )
+      : null;
+    const bySrc = (state.pendingGlobal.papers || []).find(
+      (x) => x.source_pdf === filename
+    );
+    const hit = bySlug || bySrc;
+    if (hit) {
+      patch.pending_extract = Number(hit.pending) || 0;
+    } else {
+      patch.pending_extract = (Number(p?.pending_extract) || 0) + 1;
     }
     if (state.paperSlug) patch.paper_slug = state.paperSlug;
     if (state.title) patch.title = state.title;
@@ -688,26 +712,93 @@
     el.innerHTML = lines.join("<br>");
   }
 
-  function updateExtractButtons(items) {
-    const list = items || [];
-    const pending = list.filter((c) => !c.extracted).length;
-    const total = list.length;
-    const enabled = !!state.paperSlug && pending > 0;
+  function applyPendingGlobal(data) {
+    if (!data || typeof data !== "object") return;
+    state.pendingGlobal = {
+      total: Number(data.total) || 0,
+      papers: data.papers || [],
+      items: data.items || [],
+    };
+    // Keep paper list pending badges in sync when we know per-source counts
+    if (Array.isArray(state.papers) && state.papers.length) {
+      const bySrc = {};
+      for (const p of state.pendingGlobal.papers) {
+        if (p.source_pdf) bySrc[p.source_pdf] = Number(p.pending) || 0;
+      }
+      for (const paper of state.papers) {
+        if (Object.prototype.hasOwnProperty.call(bySrc, paper.filename)) {
+          paper.pending_extract = bySrc[paper.filename];
+        } else if (paper.paper_slug) {
+          // zero out if slug known but not in pending list
+          const hit = state.pendingGlobal.papers.find(
+            (x) => x.paper_slug === paper.paper_slug
+          );
+          paper.pending_extract = hit ? Number(hit.pending) || 0 : 0;
+        }
+      }
+    }
+  }
+
+  function paperPendingCount() {
+    if (!state.paperSlug) return 0;
+    const hit = (state.pendingGlobal.papers || []).find(
+      (p) => p.paper_slug === state.paperSlug
+    );
+    return hit ? Number(hit.pending) || 0 : 0;
+  }
+
+  function updateExtractButtons(localItems) {
+    const globalTotal = Number(state.pendingGlobal?.total) || 0;
+    const localList = localItems || [];
+    const localPending = localList.length
+      ? localList.filter((c) => !c.extracted).length
+      : paperPendingCount();
+    const localTotal = localList.length;
+    const enabled = globalTotal > 0;
     ["btn-extract-batch", "btn-extract-batch-side"].forEach((id) => {
       const btn = $(id);
       if (!btn) return;
       btn.disabled = !enabled;
       btn.title = enabled
-        ? `批量提取 ${pending} 处未提取标记`
-        : total
-          ? "本篇标记均已提取"
-          : "请先框选并确认截取";
+        ? `批量提取全部 ${globalTotal} 处待处理标记（跨文献）`
+        : "暂无待提取标记";
+      const label =
+        globalTotal > 0 ? `提取表格 (${globalTotal})` : "提取表格";
+      btn.textContent = label;
     });
     const hint = $("extract-pending-hint");
     if (hint) {
-      if (!total) hint.textContent = "尚未标记区域";
-      else if (pending) hint.textContent = `${pending}/${total} 待提取`;
-      else hint.textContent = `全部 ${total} 处已提取`;
+      const paperN = (state.pendingGlobal.papers || []).length;
+      hint.textContent =
+        globalTotal > 0
+          ? `全局待提取: ${globalTotal}（${paperN} 篇）`
+          : "全局待提取: 0";
+    }
+    const ph = $("extract-paper-hint");
+    if (ph) {
+      if (!state.paperSlug) {
+        ph.textContent = "本篇: —（打开并标记后计入全局）";
+      } else if (localTotal) {
+        ph.textContent = localPending
+          ? `本篇: ${localPending}/${localTotal} 待提取`
+          : `本篇: 全部 ${localTotal} 处已提取`;
+      } else {
+        ph.textContent =
+          localPending > 0
+            ? `本篇: ${localPending} 待提取`
+            : "本篇: 尚无标记";
+      }
+    }
+  }
+
+  async function refreshPendingGlobal() {
+    try {
+      const data = await api("/api/extract/pending");
+      applyPendingGlobal(data);
+      updateExtractButtons(null);
+      renderPaperList();
+    } catch (_) {
+      /* ignore — e.g. offline */
     }
   }
 
@@ -900,11 +991,15 @@
   async function loadPapers() {
     state.papers = await api("/api/papers");
     renderPaperList();
+    await refreshPendingGlobal();
     const q = (state.filter || "").trim();
+    const pend = Number(state.pendingGlobal?.total) || 0;
     setStatus(
       q
-        ? `已加载 ${state.papers.length} 篇 · 筛选「${q}」`
-        : `已加载 ${state.papers.length} 篇 PDF`
+        ? `已加载 ${state.papers.length} 篇 · 筛选「${q}」` +
+            (pend ? ` · 待提取 ${pend}` : "")
+        : `已加载 ${state.papers.length} 篇 PDF` +
+            (pend ? ` · 待提取 ${pend}` : "")
     );
   }
 
@@ -931,7 +1026,9 @@
       renderPaperList();
       renderPreview(null);
       renderPaths(null);
+      // Keep global pending badge; only clear local list until slug known
       renderCaptures([]);
+      updateExtractButtons([]);
 
       const titleInfo = await api(
         `/api/papers/title?filename=${encodeURIComponent(filename)}`
@@ -1050,6 +1147,7 @@
   async function refreshCaptures() {
     if (!state.paperSlug) {
       renderCaptures([]);
+      updateExtractButtons([]);
       return;
     }
     const data = await api(
@@ -1128,8 +1226,16 @@
       updateTitleUi();
       renderPreview([]);
       renderPaths(result);
+      if (result.pending_global) {
+        applyPendingGlobal(result.pending_global);
+      }
       await refreshCaptures();
       bumpPaperCaptureCount(state.filename, result.table_id);
+      if (!result.pending_global) await refreshPendingGlobal();
+      else {
+        updateExtractButtons(null);
+        renderPaperList();
+      }
 
       // Remove accepted prebox if any (match by page + current index)
       if (state.preboxIndex >= 0 && state.preboxes.length) {
@@ -1150,8 +1256,9 @@
         }
       }
 
+      const g = Number(state.pendingGlobal?.total) || 0;
       setStatus(
-        `已标记 table${result.table_id}（仅保存截图，待批量提取）`,
+        `已标记 table${result.table_id}（仅截图）· 全局待提取 ${g}`,
         "ok"
       );
     } catch (e) {
@@ -1173,8 +1280,14 @@
       state.lastResult = result;
       renderPreview(result.preview);
       renderPaths(result);
+      if (result.pending_global) applyPendingGlobal(result.pending_global);
       if (result.captures) renderCaptures(result.captures);
       else await refreshCaptures();
+      if (!result.pending_global) await refreshPendingGlobal();
+      else {
+        updateExtractButtons(result.captures || null);
+        renderPaperList();
+      }
       setStatus(
         `已提取 table${tableId}（${result.engine}，${result.rows}×${result.cols}）`,
         "ok"
@@ -1187,19 +1300,25 @@
   }
 
   async function extractBatch() {
-    if (!state.paperSlug) {
-      setStatus("请先确认标题并至少截取一处区域", "warn");
+    const globalTotal = Number(state.pendingGlobal?.total) || 0;
+    if (globalTotal <= 0) {
+      setStatus("当前没有待提取的标记区域", "warn");
       return;
     }
     try {
-      showLoading(true, "批量提取表格…");
+      showLoading(true, `批量提取全部 ${globalTotal} 处…`);
       const useAi = $("ai-toggle")?.checked ? "true" : "false";
+      // Cross-paper: extract every unextracted mark
       const result = await api(
-        `/api/capture/${encodeURIComponent(state.paperSlug)}/extract-batch?use_ai=${useAi}&only_pending=true`,
+        `/api/extract/batch-all?use_ai=${useAi}`,
         { method: "POST" }
       );
-      if (result.captures) renderCaptures(result.captures);
-      else await refreshCaptures();
+      if (result.pending_global) applyPendingGlobal(result.pending_global);
+      else await refreshPendingGlobal();
+      // Refresh current paper list if open
+      if (state.paperSlug) await refreshCaptures();
+      else updateExtractButtons(null);
+      renderPaperList();
       const lastOk = (result.results || []).slice(-1)[0];
       if (lastOk) {
         state.lastResult = lastOk;
@@ -1208,8 +1327,9 @@
       }
       const errN = result.failed || 0;
       setStatus(
-        `批量提取完成：成功 ${result.ok || 0}/${result.requested || 0}` +
-          (errN ? `，失败 ${errN}` : ""),
+        `全局批量提取完成：成功 ${result.ok || 0}/${result.requested || 0}` +
+          (errN ? `，失败 ${errN}` : "") +
+          ` · 涉及 ${result.papers || 0} 篇`,
         errN ? "warn" : "ok"
       );
     } catch (e) {
@@ -1231,8 +1351,14 @@
       state.lastResult = result;
       renderPreview(result.preview);
       renderPaths(result);
+      if (result.pending_global) applyPendingGlobal(result.pending_global);
       if (result.captures) renderCaptures(result.captures);
       else await refreshCaptures();
+      if (!result.pending_global) await refreshPendingGlobal();
+      else {
+        updateExtractButtons(result.captures || null);
+        renderPaperList();
+      }
       setStatus(`已重新提取 table${tableId}（${result.engine}）`, "ok");
     } catch (e) {
       setStatus(`重提取失败: ${e.message}`, "warn");

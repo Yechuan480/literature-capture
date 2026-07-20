@@ -12,6 +12,7 @@ class PaperItem(BaseModel):
     size: int
     mtime: str
     capture_count: int = 0
+    pending_extract: int = 0
     paper_slug: str | None = None
     no_tables: bool = False
     title: str | None = None

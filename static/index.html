@@ -98,7 +98,7 @@
             <button type="button" id="btn-select">框选模式</button>
             <button type="button" class="primary" id="btn-capture">确认截取</button>
             <button type="button" id="btn-cancel-select" class="ghost">取消</button>
-            <button type="button" id="btn-extract-batch" title="对本篇已标记区域批量提取表格内容" disabled>提取表格</button>
+            <button type="button" id="btn-extract-batch" title="批量提取全部待处理标记（跨文献累加）" disabled>提取表格</button>
           </div>
         </div>
 
@@ -136,8 +136,9 @@
           </div>
           <div class="capture-actions">
             <button type="button" class="primary" id="btn-extract-batch-side" disabled>提取表格</button>
-            <span class="hint" id="extract-pending-hint">尚未标记区域</span>
+            <span class="hint" id="extract-pending-hint">全局待提取: 0</span>
           </div>
+          <p class="hint" id="extract-paper-hint">本篇: —</p>
           <div class="capture-actions">
             <span class="hint">快捷键：←/→ 翻页 · T/Shift+T 跳 Table · [/] 预框 · R/Shift+R 旋转 · Esc 取消框选</span>
           </div>

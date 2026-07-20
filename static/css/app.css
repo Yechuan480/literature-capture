@@ -383,12 +383,25 @@ button.no-tables-active {
   min-width: 2rem;
 }
 
+.paper-list .paper-badge.done.pending-extract {
+  background: rgba(251, 191, 36, 0.14);
+  border-color: rgba(251, 191, 36, 0.5);
+  color: var(--warn);
+  min-width: 2.4rem;
+}
+
 .paper-list .paper-badge.done .check {
   font-size: 0.72rem;
 }
 
 .paper-list .paper-badge.done .count {
   font-variant-numeric: tabular-nums;
+}
+
+.paper-list .paper-badge.done .pend {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+  font-weight: 650;
 }
 
 .paper-list li.has-captures {

@@ -8,6 +8,7 @@ from app.paths import (
     allocate_paper_dir,
     get_paper_dir,
     list_captures,
+    list_pending_extracts,
     load_meta,
     next_table_paths,
     safe_pdf_path,
@@ -184,6 +185,7 @@ async def capture_table(
         "page": page,
         "extracted": False,
         "capture_count": n,
+        "pending_global": list_pending_extracts(),
     }
 
 
@@ -210,6 +212,7 @@ def extract_one(
     )
     save_meta(paper_dir, meta)
     out["captures"] = list_captures(paper_dir, meta)
+    out["pending_global"] = list_pending_extracts()
     return out
 
 
@@ -255,6 +258,7 @@ def extract_batch(
             errors.append({"table_id": tid, "error": str(e)})
 
     save_meta(paper_dir, meta)
+    pending = list_pending_extracts()
     return {
         "paper_slug": meta["paper_slug"],
         "title": meta.get("title") or "",
@@ -264,6 +268,80 @@ def extract_batch(
         "results": results,
         "errors": errors,
         "captures": list_captures(paper_dir, meta),
+        "pending_global": pending,
+        "use_ai": use_ai,
+        "force_engine": force_engine,
+    }
+
+
+@router.get("/extract/pending")
+def get_pending_extracts():
+    """Global queue of unextracted marked screenshots across all papers."""
+    return list_pending_extracts()
+
+
+@router.post("/extract/batch-all")
+def extract_batch_all(
+    use_ai: bool = Query(False),
+    force_engine: str | None = Query(None),
+):
+    """
+    Batch-extract every unextracted marked region across all papers.
+    Progress is sequential paper-by-paper.
+    """
+    pending = list_pending_extracts()
+    all_results: list[dict] = []
+    all_errors: list[dict] = []
+    papers_touched = 0
+
+    for paper in pending.get("papers") or []:
+        slug = paper.get("paper_slug")
+        if not slug:
+            continue
+        try:
+            paper_dir = get_paper_dir(slug)
+        except HTTPException as e:
+            all_errors.append({"paper_slug": slug, "error": e.detail})
+            continue
+        meta = load_meta(paper_dir)
+        if not meta:
+            all_errors.append({"paper_slug": slug, "error": "meta 缺失"})
+            continue
+        papers_touched += 1
+        for item in paper.get("items") or []:
+            tid = int(item.get("table_id") or 0)
+            if not tid:
+                continue
+            try:
+                all_results.append(
+                    _run_extract_one(
+                        paper_dir,
+                        meta,
+                        tid,
+                        use_ai=use_ai,
+                        force_engine=force_engine,
+                        action="batch_extract_all",
+                    )
+                )
+            except HTTPException as e:
+                all_errors.append(
+                    {"paper_slug": slug, "table_id": tid, "error": e.detail}
+                )
+            except Exception as e:
+                all_errors.append(
+                    {"paper_slug": slug, "table_id": tid, "error": str(e)}
+                )
+        save_meta(paper_dir, meta)
+
+    after = list_pending_extracts()
+    return {
+        "requested": int(pending.get("total") or 0),
+        "ok": len(all_results),
+        "failed": len(all_errors),
+        "papers": papers_touched,
+        "results": all_results,
+        "errors": all_errors,
+        "pending_global": after,
         "use_ai": use_ai,
         "force_engine": force_engine,
     }
@@ -287,4 +365,5 @@ def reextract(slug: str, table_id: int, use_ai: bool = False):
     )
     save_meta(paper_dir, meta)
     out["captures"] = list_captures(paper_dir, meta)
+    out["pending_global"] = list_pending_extracts()
     return out

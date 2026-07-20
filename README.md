@@ -113,8 +113,9 @@ export LITERATURE_ROOT="/path/to/your/library"
 4. **未标注**文献打开后自动 **Paddle 预框**（已截取 / 无表格 的不跑）  
 5. 使用 **‹框 / 框›** 或 `[` / `]` 审阅预框，可 **删框** 或拖角微调，再 **确认截取**（**仅保存 PNG**，不即时提取）  
 6. 亦可 **‹表 / 表›** / `T` 跳到含 `table` 字样的页（黄色高亮），或手动框选  
-7. 本篇所有目标区域标完后，点工具栏或右侧 **提取表格** 批量识别 → 写入 CSV/XLSX  
-8. 右侧「本篇已标记」可对单项 **提取** / **重新提取**  
+7. 可继续打开下一篇继续标记（**待提取计数跨文献累加**）  
+8. 点工具栏或右侧 **提取表格 (N)** 对**全部**未提取截图批量识别 → 写入 CSV/XLSX  
+9. 右侧「本篇已标记」可对单项 **提取** / **重新提取**  
 
 其他快捷键：`←`/`→` 翻页 · `R`/`Shift+R` 旋转 · `Backspace` 删当前预框 · `Esc` 取消框选  
 
@@ -161,7 +162,9 @@ export LITERATURE_AI_ENABLED=true
 | POST | `/api/papers/session` | 确认标题 / 建文件夹 |
 | GET | `/api/pdf/{filename}` | 获取 PDF |
 | POST | `/api/capture` | 上传截图（**仅保存 PNG**，不提取） |
-| POST | `/api/capture/{slug}/extract-batch` | 批量提取本篇未提取截图 |
+| GET | `/api/extract/pending` | 全局待提取队列（跨文献） |
+| POST | `/api/extract/batch-all` | 批量提取**全部**未处理截图 |
+| POST | `/api/capture/{slug}/extract-batch` | 批量提取**本篇**未提取截图 |
 | POST | `/api/capture/{slug}/{id}/extract` | 提取单张截图 |
 | POST | `/api/capture/{slug}/{id}/reextract` | 重新提取 |
 | GET | `/api/review/queue` | 校对队列 |

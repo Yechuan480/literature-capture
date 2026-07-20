@@ -80,7 +80,7 @@ def safe_pdf_path(filename: str, settings: Settings | None = None) -> Path:
 
 
 def capture_stats_by_source_pdf(settings: Settings | None = None) -> dict[str, dict[str, Any]]:
-    """Map source_pdf filename → {count, paper_slug, no_tables, title} from _captures meta."""
+    """Map source_pdf filename → {count, pending_extract, paper_slug, no_tables, title}."""
     settings = settings or get_settings()
     out: dict[str, dict[str, Any]] = {}
     root = settings.captures_root
@@ -99,15 +99,70 @@ def capture_stats_by_source_pdf(settings: Settings | None = None) -> dict[str, d
         # Prefer actual PNG count; fall back to table_counter
         png_n = len(list(child.glob(f"{slug}-table*.png")))
         count = png_n if png_n else int(meta.get("table_counter") or 0)
+        caps = list_captures(child, meta) if png_n else []
+        pending = sum(1 for c in caps if not c.get("extracted"))
         prev = out.get(src)
         if prev is None or count >= int(prev.get("count") or 0):
             out[src] = {
                 "count": count,
+                "pending_extract": pending,
                 "paper_slug": slug,
                 "no_tables": bool(meta.get("no_tables")),
                 "title": meta.get("title") or "",
             }
     return out
+
+
+def list_pending_extracts(settings: Settings | None = None) -> dict[str, Any]:
+    """
+    All unextracted marked screenshots across papers (for global queue / batch).
+    Returns {total, papers: [{paper_slug, title, source_pdf, pending, items: [...]}]}.
+    """
+    settings = settings or get_settings()
+    root = settings.captures_root
+    papers: list[dict[str, Any]] = []
+    total = 0
+    if not root.is_dir():
+        return {"total": 0, "papers": [], "items": []}
+    flat: list[dict[str, Any]] = []
+    for child in sorted(root.iterdir(), key=lambda p: p.name.lower()):
+        if not child.is_dir():
+            continue
+        meta = load_meta(child)
+        if not meta:
+            continue
+        caps = list_captures(child, meta)
+        pending_items = [c for c in caps if not c.get("extracted")]
+        if not pending_items:
+            continue
+        slug = meta.get("paper_slug") or child.name
+        title = meta.get("title") or ""
+        src = meta.get("source_pdf") or ""
+        paper_items = []
+        for c in pending_items:
+            item = {
+                "paper_slug": slug,
+                "title": title,
+                "source_pdf": src,
+                "table_id": int(c["table_id"]),
+                "stem": c.get("stem"),
+                "page": c.get("page"),
+                "png_name": c.get("png_name"),
+            }
+            paper_items.append(item)
+            flat.append(item)
+        n = len(paper_items)
+        total += n
+        papers.append(
+            {
+                "paper_slug": slug,
+                "title": title,
+                "source_pdf": src,
+                "pending": n,
+                "items": paper_items,
+            }
+        )
+    return {"total": total, "papers": papers, "items": flat}
 
 
 def _paper_sort_key(item: dict[str, Any]) -> tuple:
@@ -155,6 +210,7 @@ def list_pdfs(settings: Settings | None = None) -> list[dict[str, Any]]:
                     .replace(microsecond=0)
                     .isoformat(),
                     "capture_count": int(st.get("count") or 0),
+                    "pending_extract": int(st.get("pending_extract") or 0),
                     "paper_slug": st.get("paper_slug"),
                     "no_tables": bool(st.get("no_tables")),
                     "title": (st.get("title") or "") or None,
