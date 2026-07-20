@@ -90,6 +90,9 @@ export LITERATURE_ROOT="/path/to/your/library"
 
 ## 使用说明
 
+更细的操作步骤见 **[USAGE.md](USAGE.md)**。
+
+
 ### 1. 截取表格（主页 `/`）
 
 1. 将 PDF 放入 `pdfs/`，侧栏点击一篇文献  
