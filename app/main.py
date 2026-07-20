@@ -72,7 +72,6 @@ def public_config():
         "ai_enabled": bool(ai.get("ready")),
         "ai": ai,
         "paddle": pst,
-        "prebox_enabled": bool(settings.paddle_enabled),
     }
 
 
