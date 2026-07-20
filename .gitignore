@@ -1,0 +1,39 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Env & secrets (never commit API keys)
+.env
+.env.*
+!.env.example
+data/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local literature library (PDFs and captures stay outside the app)
+# If someone runs with literature_root=. these must never be committed
+pdfs/
+_captures/
+*.pdf
+*.PDF
+
+# Local runtime
+*.log
+.cache/

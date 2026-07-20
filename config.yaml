@@ -1,0 +1,22 @@
+# 文献根目录：默认指向本应用的上一级
+# 也可写成绝对路径，例如 /Users/book/Desktop/Aqueous literature
+literature_root: null
+# PDF 存放子目录（相对 literature_root）
+pdfs_subdir: pdfs
+
+ocr:
+  # auto | img2table_tesseract | rapidocr
+  engine: auto
+  lang: eng+chi_sim
+  upscale_min_side: 1000
+
+ai:
+  # 默认关闭；可在网页右侧「AI 设置」启用并填写 Key（保存到 data/ai_settings.json）
+  enabled: false
+  base_url: https://api.openai.com/v1
+  model: gpt-4o
+  # 也可放环境变量 LITERATURE_AI_API_KEY 作为初始种子
+
+server:
+  host: 127.0.0.1
+  port: 8765

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>表格校对 · 文献截取</title>
+    <link rel="stylesheet" href="/static/css/app.css" />
+    <link rel="stylesheet" href="/static/css/review.css" />
+  </head>
+  <body class="review-page">
+    <header class="review-header">
+      <div class="rh-left">
+        <a class="brand" href="/">← 截取工具</a>
+        <h1>表格校对</h1>
+        <p class="hint">对比截图与提取结果 · 通过后不再出现 · 不通过可换策略重提</p>
+      </div>
+      <div class="rh-stats" id="stats-bar">
+        <span class="stat"><b id="st-remaining">—</b> 待校对</span>
+        <span class="stat ok"><b id="st-passed">—</b> 已通过</span>
+        <span class="stat warn"><b id="st-failed">—</b> 未通过</span>
+        <span class="stat"><b id="st-papers">—</b> 文献完成</span>
+      </div>
+    </header>
+
+    <div class="review-layout">
+      <aside class="review-sidebar">
+        <div class="panel-header">
+          <h2>校对队列</h2>
+          <p id="queue-hint" class="hint">加载中…</p>
+        </div>
+        <ul class="queue-list" id="queue-list"></ul>
+      </aside>
+
+      <main class="review-main" id="review-main">
+        <div class="empty-state" id="empty-state">
+          <h2>没有待校对的表格</h2>
+          <p>所有已截取表格均已通过，或尚无截图。请先在主页框选提取。</p>
+          <a class="primary-link" href="/">返回截取工具</a>
+        </div>
+
+        <div class="review-work" id="review-work" hidden>
+          <div class="work-meta">
+            <div>
+              <div class="work-title" id="work-title">—</div>
+              <div class="work-sub" id="work-sub">—</div>
+            </div>
+            <div class="work-badges">
+              <span class="badge" id="badge-status">pending</span>
+              <span class="badge" id="badge-engine">—</span>
+              <span class="badge" id="badge-size">—</span>
+            </div>
+          </div>
+
+          <div class="compare-grid">
+            <section class="pane pane-png">
+              <div class="pane-head">
+                <h3>原图截图 (PNG)</h3>
+                <a id="png-open" href="#" target="_blank" rel="noopener">新窗口打开</a>
+              </div>
+              <div class="png-wrap">
+                <img id="png-img" alt="table capture" />
+              </div>
+            </section>
+            <section class="pane pane-table">
+              <div class="pane-head">
+                <h3>提取结果</h3>
+                <div class="pane-links">
+                  <a id="csv-link" href="#" target="_blank" rel="noopener">CSV</a>
+                  <a id="xlsx-link" href="#" target="_blank" rel="noopener">Excel</a>
+                </div>
+              </div>
+              <div class="table-wrap" id="table-wrap">
+                <div class="empty">加载中…</div>
+              </div>
+              <div class="warn-box" id="warn-box" hidden></div>
+            </section>
+          </div>
+
+          <div class="review-actions">
+            <div class="verdict-block">
+              <button type="button" class="btn-pass" id="btn-pass">✓ 通过</button>
+              <button type="button" class="btn-fail" id="btn-fail">✗ 不通过</button>
+              <button type="button" class="ghost" id="btn-skip">跳过</button>
+            </div>
+            <div class="retry-block" id="retry-block">
+              <label class="hint">不通过后的重提策略</label>
+              <div class="strategy-row">
+                <select id="strategy-select">
+                  <option value="auto">自动（默认引擎）</option>
+                  <option value="tesseract">Tesseract + img2table</option>
+                  <option value="rapidocr">RapidOCR 粗网格</option>
+                  <option value="ai">仅 AI 视觉</option>
+                  <option value="tesseract_ai" selected>Tesseract + AI 增强</option>
+                  <option value="rapidocr_ai">RapidOCR + AI 增强</option>
+                </select>
+                <button type="button" class="primary" id="btn-reextract">重新提取</button>
+              </div>
+              <p class="hint" id="retry-hint">
+                重新提取后状态回到「待校对」，会再次进入队列供你核对。
+              </p>
+            </div>
+          </div>
+
+          <label class="note-field">
+            <span>备注（可选）</span>
+            <input type="text" id="review-note" placeholder="例如：表头错位 / 数字 OCR 噪声…" />
+          </label>
+        </div>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+    <div id="loading-mask" class="loading-mask">处理中…</div>
+
+    <script src="/static/js/review.js"></script>
+  </body>
+</html>
