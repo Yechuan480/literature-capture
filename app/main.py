@@ -19,7 +19,7 @@ from app.services.paddle_runtime import paddle_status
 settings = get_settings()
 settings.ensure_dirs()
 
-app = FastAPI(title="Literature Table Capture", version="1.1.0")
+app = FastAPI(title="Literature Table Capture", version="1.2.0")
 app.include_router(papers.router)
 app.include_router(capture.router)
 app.include_router(settings_router.router)

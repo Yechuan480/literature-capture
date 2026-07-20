@@ -11,7 +11,7 @@
       <aside class="sidebar">
         <div class="panel-header">
           <h1>文献表格截取</h1>
-          <p>选择 PDF → 确认标题 → 框选表格 → 自动命名保存并提取</p>
+          <p>选择 PDF → 确认标题 → 框选截图保存 → 批量提取表格</p>
           <p class="hint"><a href="/review" style="color: var(--accent)">→ 进入表格校对</a></p>
         </div>
         <div class="sidebar-tools">
@@ -98,6 +98,7 @@
             <button type="button" id="btn-select">框选模式</button>
             <button type="button" class="primary" id="btn-capture">确认截取</button>
             <button type="button" id="btn-cancel-select" class="ghost">取消</button>
+            <button type="button" id="btn-extract-batch" title="对本篇已标记区域批量提取表格内容" disabled>提取表格</button>
           </div>
         </div>
 
@@ -120,18 +121,22 @@
 
       <aside class="rightbar">
         <div class="panel-header">
-          <h2>提取结果</h2>
-          <p>截图按「标题-tableN」保存，并导出 CSV / Excel · <a href="/review" style="color: var(--accent)">校对队列</a></p>
+          <h2>截取与提取</h2>
+          <p>先框选保存 PNG，全部标完后点「提取表格」批量出 CSV/Excel · <a href="/review" style="color: var(--accent)">校对队列</a></p>
         </div>
 
         <div class="right-section">
           <h3>选项</h3>
           <label class="hint ai-toggle-row">
-            <input type="checkbox" id="ai-toggle" /> 使用 AI 视觉增强
+            <input type="checkbox" id="ai-toggle" /> 提取时使用 AI 视觉增强
           </label>
           <div class="ai-status-line">
             <span class="badge" id="ai-status-badge">AI: 未配置</span>
             <button type="button" class="ghost sm" id="btn-ai-settings">AI 设置</button>
+          </div>
+          <div class="capture-actions">
+            <button type="button" class="primary" id="btn-extract-batch-side" disabled>提取表格</button>
+            <span class="hint" id="extract-pending-hint">尚未标记区域</span>
           </div>
           <div class="capture-actions">
             <span class="hint">快捷键：←/→ 翻页 · T/Shift+T 跳 Table · [/] 预框 · R/Shift+R 旋转 · Esc 取消框选</span>
@@ -186,7 +191,7 @@
         <div class="right-section">
           <h3>表格预览</h3>
           <div id="preview-table-wrap" class="preview-table-wrap">
-            <div class="empty">截取后显示预览</div>
+            <div class="empty">批量提取后显示预览</div>
           </div>
         </div>
 
@@ -196,7 +201,7 @@
         </div>
 
         <div class="panel-header" style="border-top: 1px solid var(--border)">
-          <h2>本篇已截取</h2>
+          <h2>本篇已标记</h2>
         </div>
         <ul class="capture-list" id="capture-list">
           <li class="empty">打开并确认标题后显示</li>

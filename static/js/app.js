@@ -681,41 +681,81 @@
       el.textContent = "";
       return;
     }
-    el.innerHTML = [
-      `PNG: ${result.paths.png}`,
-      `CSV: ${result.paths.csv}`,
-      `XLSX: ${result.paths.xlsx}`,
-    ].join("<br>");
+    const lines = [`PNG: ${result.paths.png || "—"}`];
+    if (result.paths.csv) lines.push(`CSV: ${result.paths.csv}`);
+    if (result.paths.xlsx) lines.push(`XLSX: ${result.paths.xlsx}`);
+    if (result.extracted === false) lines.push("（仅截图，待批量提取）");
+    el.innerHTML = lines.join("<br>");
+  }
+
+  function updateExtractButtons(items) {
+    const list = items || [];
+    const pending = list.filter((c) => !c.extracted).length;
+    const total = list.length;
+    const enabled = !!state.paperSlug && pending > 0;
+    ["btn-extract-batch", "btn-extract-batch-side"].forEach((id) => {
+      const btn = $(id);
+      if (!btn) return;
+      btn.disabled = !enabled;
+      btn.title = enabled
+        ? `批量提取 ${pending} 处未提取标记`
+        : total
+          ? "本篇标记均已提取"
+          : "请先框选并确认截取";
+    });
+    const hint = $("extract-pending-hint");
+    if (hint) {
+      if (!total) hint.textContent = "尚未标记区域";
+      else if (pending) hint.textContent = `${pending}/${total} 待提取`;
+      else hint.textContent = `全部 ${total} 处已提取`;
+    }
   }
 
   function renderCaptures(items) {
     const ul = $("capture-list");
     ul.innerHTML = "";
     if (!items || !items.length) {
-      ul.innerHTML = `<li class="empty">本篇尚无截图</li>`;
+      ul.innerHTML = `<li class="empty">本篇尚无标记截图</li>`;
+      updateExtractButtons([]);
       return;
     }
     for (const c of items) {
       const li = document.createElement("li");
+      const extracted = !!c.extracted;
+      li.classList.toggle("cap-pending", !extracted);
+      li.classList.toggle("cap-extracted", extracted);
       li.innerHTML = `
         <div class="cap-title"></div>
         <div class="cap-meta"></div>
         <div class="cap-actions">
-          <button type="button" data-act="reextract">重新提取</button>
+          <button type="button" data-act="extract"></button>
         </div>`;
-      li.querySelector(".cap-title").textContent = c.stem || `table${c.table_id}`;
-      li.querySelector(".cap-meta").textContent = [
+      const status = extracted
+        ? c.review_status === "passed"
+          ? "已通过"
+          : c.review_status === "failed"
+            ? "不通过"
+            : "已提取"
+        : "仅截图";
+      li.querySelector(".cap-title").textContent =
+        `${c.stem || `table${c.table_id}`} · ${status}`;
+      const metaParts = [
+        c.page != null ? `p.${c.page}` : null,
         c.png_name,
         c.csv_name,
         c.xlsx_name,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      li.querySelector('[data-act="reextract"]').addEventListener("click", () =>
-        reextract(c.table_id)
-      );
+        c.engine || null,
+      ].filter(Boolean);
+      li.querySelector(".cap-meta").textContent = metaParts.join(" · ");
+      const actBtn = li.querySelector('[data-act="extract"]');
+      actBtn.textContent = extracted ? "重新提取" : "提取";
+      actBtn.addEventListener("click", () => {
+        if (extracted) reextract(c.table_id);
+        else extractOne(c.table_id);
+      });
       ul.appendChild(li);
     }
+    updateExtractButtons(items);
   }
 
   async function loadConfig() {
@@ -740,7 +780,7 @@
       toggle.disabled = !ready;
       if (!ready) toggle.checked = false;
       toggle.title = ready
-        ? "截取时在本地 OCR 后调用视觉模型增强"
+        ? "批量/单项提取时在本地 OCR 后调用视觉模型增强"
         : "请先在「AI 设置」中启用并填写 API Key";
     }
     const badge = $("ai-status-badge");
@@ -1058,7 +1098,7 @@
     }
 
     try {
-      showLoading(true, "截取并提取表格…");
+      showLoading(true, "保存截图…");
       // Ensure session exists / updated
       if (!state.paperSlug || state.title !== title) {
         const session = await api("/api/papers/session", {
@@ -1078,7 +1118,7 @@
       fd.append("filename", state.filename);
       fd.append("title", title);
       fd.append("page", String(PdfViewer.state.page || 1));
-      fd.append("use_ai", $("ai-toggle").checked ? "true" : "false");
+      fd.append("use_ai", "false");
 
       const result = await api("/api/capture", { method: "POST", body: fd });
       state.lastResult = result;
@@ -1086,7 +1126,7 @@
       state.folder = result.folder;
       state.noTables = false;
       updateTitleUi();
-      renderPreview(result.preview);
+      renderPreview([]);
       renderPaths(result);
       await refreshCaptures();
       bumpPaperCaptureCount(state.filename, result.table_id);
@@ -1110,16 +1150,70 @@
         }
       }
 
-      const warn =
-        result.warnings && result.warnings.length
-          ? ` · 警告: ${result.warnings.join("; ")}`
-          : "";
       setStatus(
-        `已保存 table${result.table_id}（${result.engine}，${result.rows}×${result.cols}）${warn}`,
-        result.warnings?.length ? "warn" : "ok"
+        `已标记 table${result.table_id}（仅保存截图，待批量提取）`,
+        "ok"
       );
     } catch (e) {
       setStatus(`截取失败: ${e.message}`, "warn");
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  async function extractOne(tableId) {
+    if (!state.paperSlug) return;
+    try {
+      showLoading(true, `提取 table${tableId}…`);
+      const useAi = $("ai-toggle")?.checked ? "true" : "false";
+      const result = await api(
+        `/api/capture/${encodeURIComponent(state.paperSlug)}/${tableId}/extract?use_ai=${useAi}`,
+        { method: "POST" }
+      );
+      state.lastResult = result;
+      renderPreview(result.preview);
+      renderPaths(result);
+      if (result.captures) renderCaptures(result.captures);
+      else await refreshCaptures();
+      setStatus(
+        `已提取 table${tableId}（${result.engine}，${result.rows}×${result.cols}）`,
+        "ok"
+      );
+    } catch (e) {
+      setStatus(`提取失败: ${e.message}`, "warn");
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  async function extractBatch() {
+    if (!state.paperSlug) {
+      setStatus("请先确认标题并至少截取一处区域", "warn");
+      return;
+    }
+    try {
+      showLoading(true, "批量提取表格…");
+      const useAi = $("ai-toggle")?.checked ? "true" : "false";
+      const result = await api(
+        `/api/capture/${encodeURIComponent(state.paperSlug)}/extract-batch?use_ai=${useAi}&only_pending=true`,
+        { method: "POST" }
+      );
+      if (result.captures) renderCaptures(result.captures);
+      else await refreshCaptures();
+      const lastOk = (result.results || []).slice(-1)[0];
+      if (lastOk) {
+        state.lastResult = lastOk;
+        renderPreview(lastOk.preview);
+        renderPaths(lastOk);
+      }
+      const errN = result.failed || 0;
+      setStatus(
+        `批量提取完成：成功 ${result.ok || 0}/${result.requested || 0}` +
+          (errN ? `，失败 ${errN}` : ""),
+        errN ? "warn" : "ok"
+      );
+    } catch (e) {
+      setStatus(`批量提取失败: ${e.message}`, "warn");
     } finally {
       showLoading(false);
     }
@@ -1129,7 +1223,7 @@
     if (!state.paperSlug) return;
     try {
       showLoading(true, "重新提取…");
-      const useAi = $("ai-toggle").checked;
+      const useAi = $("ai-toggle")?.checked ? "true" : "false";
       const result = await api(
         `/api/capture/${encodeURIComponent(state.paperSlug)}/${tableId}/reextract?use_ai=${useAi}`,
         { method: "POST" }
@@ -1256,6 +1350,8 @@
     });
     $("btn-select").addEventListener("click", toggleSelectMode);
     $("btn-capture").addEventListener("click", doCapture);
+    $("btn-extract-batch")?.addEventListener("click", extractBatch);
+    $("btn-extract-batch-side")?.addEventListener("click", extractBatch);
     $("btn-cancel-select").addEventListener("click", () => {
       RegionSelect.cancel();
       RegionSelect.setActive(false);

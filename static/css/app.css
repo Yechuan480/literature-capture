@@ -843,6 +843,14 @@ button.sm {
   gap: 0.35rem;
 }
 
+.capture-list li.cap-pending {
+  border-color: rgba(251, 191, 36, 0.4);
+}
+
+.capture-list li.cap-extracted {
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
 .empty {
   color: var(--muted);
   font-size: 0.82rem;

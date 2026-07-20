@@ -405,6 +405,28 @@ def capture_paths(paper_dir: Path, meta: dict[str, Any], table_id: int) -> dict[
     }
 
 
+def is_capture_extracted(
+    paper_dir: Path,
+    meta: dict[str, Any],
+    table_id: int,
+    *,
+    log: dict[str, Any] | None = None,
+) -> bool:
+    """True when CSV/XLSX exist or meta marks extracted=true."""
+    slug = meta.get("paper_slug", paper_dir.name)
+    stem = f"{slug}-table{int(table_id)}"
+    if (paper_dir / f"{stem}.csv").is_file() or (paper_dir / f"{stem}.xlsx").is_file():
+        return True
+    if log is None:
+        for c in meta.get("captures") or []:
+            if isinstance(c, dict) and int(c.get("table_id") or 0) == int(table_id):
+                log = c
+                break
+    if isinstance(log, dict) and log.get("extracted") is True:
+        return True
+    return False
+
+
 def list_captures(paper_dir: Path, meta: dict[str, Any]) -> list[dict[str, Any]]:
     slug = meta.get("paper_slug", paper_dir.name)
     items: list[dict[str, Any]] = []
@@ -423,6 +445,9 @@ def list_captures(paper_dir: Path, meta: dict[str, Any]) -> list[dict[str, Any]]
         xlsx = paper_dir / f"{stem}.xlsx"
         review = get_table_review(meta, n)
         log = cap_logs.get(n) or {}
+        extracted = is_capture_extracted(paper_dir, meta, n, log=log)
+        # Unextracted screenshots are not in the review queue yet
+        review_status = review["status"] if extracted else "unextracted"
         items.append(
             {
                 "table_id": n,
@@ -436,7 +461,8 @@ def list_captures(paper_dir: Path, meta: dict[str, Any]) -> list[dict[str, Any]]
                 "page": log.get("page"),
                 "engine": review.get("engine") or log.get("engine"),
                 "warnings": log.get("warnings") or [],
-                "review_status": review["status"],
+                "extracted": extracted,
+                "review_status": review_status,
                 "review_note": review.get("note") or "",
                 "reviewed_at": review.get("reviewed_at"),
                 "strategy": review.get("strategy"),
@@ -446,17 +472,22 @@ def list_captures(paper_dir: Path, meta: dict[str, Any]) -> list[dict[str, Any]]
 
 
 def paper_review_summary(captures: list[dict[str, Any]]) -> dict[str, Any]:
-    total = len(captures)
-    passed = sum(1 for c in captures if c.get("review_status") == "passed")
-    failed = sum(1 for c in captures if c.get("review_status") == "failed")
+    # Only extracted tables enter review accounting
+    extracted = [c for c in captures if c.get("extracted")]
+    total = len(extracted)
+    passed = sum(1 for c in extracted if c.get("review_status") == "passed")
+    failed = sum(1 for c in extracted if c.get("review_status") == "failed")
     pending = total - passed - failed
     all_passed = total > 0 and pending == 0 and failed == 0
+    unextracted = len(captures) - total
     return {
         "total": total,
         "passed": passed,
         "failed": failed,
         "pending": pending,
         "all_passed": all_passed,
+        "unextracted": unextracted,
+        "marked": len(captures),
     }
 
 
@@ -487,12 +518,18 @@ def list_review_queue(settings: Settings | None = None) -> dict[str, Any]:
         caps = list_captures(child, meta)
         if not caps:
             continue
+        extracted_caps = [c for c in caps if c.get("extracted")]
+        # Papers with only unextracted PNGs are not in the review workflow yet
+        if not extracted_caps:
+            continue
         summary = {
-            "total": len(caps),
-            "passed": sum(1 for c in caps if c.get("review_status") == "passed"),
-            "failed": sum(1 for c in caps if c.get("review_status") == "failed"),
+            "total": len(extracted_caps),
+            "passed": sum(1 for c in extracted_caps if c.get("review_status") == "passed"),
+            "failed": sum(1 for c in extracted_caps if c.get("review_status") == "failed"),
             "pending": 0,
             "all_passed": False,
+            "unextracted": len(caps) - len(extracted_caps),
+            "marked": len(caps),
         }
         summary["pending"] = summary["total"] - summary["passed"] - summary["failed"]
         summary["all_passed"] = (
@@ -528,7 +565,7 @@ def list_review_queue(settings: Settings | None = None) -> dict[str, Any]:
         }
         papers_out.append(paper_info)
 
-        for c in caps:
+        for c in extracted_caps:
             if c.get("review_status") == "passed":
                 continue
             queue.append(

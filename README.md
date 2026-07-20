@@ -4,7 +4,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)](#环境要求)
 
-本地网页工具：打开文献 PDF → 识别/确认标题 → 框选表格截图 → 按文献分文件夹自动命名 → 提取表格为 **CSV + Excel**，并支持人工校对与 AI 视觉增强。
+本地网页工具：打开文献 PDF → 识别/确认标题 → 框选表格区域并保存截图 → **批量提取**表格为 **CSV + Excel**，并支持人工校对与 AI 视觉增强。
 
 > **本仓库只包含应用代码，不包含任何 PDF 文献或截取结果。**  
 > 请将自己的 PDF 放在 `pdfs/` 目录（默认位于应用上一级的文献根目录下）。
@@ -20,9 +20,10 @@
 | 预览与框选 | PDF.js 翻页 / 缩放 / 旋转；拖拽框选截图 |
 | Table 导航 | 自动扫描 `table`/`tables` 所在页，快捷跳转并高亮标注 |
 | **预框选** | 打开**未标注**文献时 PaddleX 自动检出表格区域；‹框/框› 审阅、删框、拖角微调后确认截取 |
-| 表格提取 | **PP-TableMagic (PaddleX)** 优先；Tesseract + img2table；RapidOCR 后备；可选 AI 视觉 |
+| **标记截图** | 确认截取仅保存 PNG（不即时 OCR）；侧栏统计本篇已标记区域 |
+| **批量提取** | 「提取表格」对本篇未提取截图批量跑 PP-TableMagic / OCR / 可选 AI |
 | 导出 | `{标题}-tableN.png` / `.csv` / `.xlsx`，每篇独立文件夹 |
-| 校对队列 | 左右对比 PNG 与提取表，通过 / 不通过，含 PP-TableMagic 等多策略重提 |
+| 校对队列 | 提取完成后左右对比 PNG 与表，通过 / 不通过，多策略重提 |
 | AI 设置 | 网页内填写 OpenAI 兼容接口（Key 仅存本机，不入库） |
 
 ---
@@ -110,9 +111,10 @@ export LITERATURE_ROOT="/path/to/your/library"
 2. 核对/编辑标题 → **确认标题**  
 3. 若整篇无表格 → **无表格**（列表中标注并沉底）  
 4. **未标注**文献打开后自动 **Paddle 预框**（已截取 / 无表格 的不跑）  
-5. 使用 **‹框 / 框›** 或 `[` / `]` 审阅预框，可 **删框** 或拖角微调，再 **确认截取**  
+5. 使用 **‹框 / 框›** 或 `[` / `]` 审阅预框，可 **删框** 或拖角微调，再 **确认截取**（**仅保存 PNG**，不即时提取）  
 6. 亦可 **‹表 / 表›** / `T` 跳到含 `table` 字样的页（黄色高亮），或手动框选  
-7. 右侧查看预览；文件写入 `_captures/{slug}/`  
+7. 本篇所有目标区域标完后，点工具栏或右侧 **提取表格** 批量识别 → 写入 CSV/XLSX  
+8. 右侧「本篇已标记」可对单项 **提取** / **重新提取**  
 
 其他快捷键：`←`/`→` 翻页 · `R`/`Shift+R` 旋转 · `Backspace` 删当前预框 · `Esc` 取消框选  
 
@@ -120,7 +122,7 @@ export LITERATURE_ROOT="/path/to/your/library"
 
 ### 2. 校对提取结果（`/review`）
 
-1. 主页链接进入 **表格校对**  
+1. 主页链接进入 **表格校对**（仅**已提取**的表格会入队）  
 2. 左右对比 PNG 与提取表  
 3. **通过** → 该项（及全篇全通过的文献）不再出现在队列  
 4. **不通过** → 选择策略（**PP-TableMagic** / Tesseract / RapidOCR / AI）**重新提取**，回到待校对  
@@ -132,7 +134,7 @@ export LITERATURE_ROOT="/path/to/your/library"
 1. 主页右侧 **AI 设置**  
 2. 勾选「启用 AI 视觉」，填写 Base URL、Model、API Key（OpenAI 兼容）  
 3. **保存** / **测试连接**  
-4. 截取时勾选「使用 AI 视觉增强」，或在校对页选用含 AI 的重提策略  
+4. **批量/单项提取时**勾选「提取时使用 AI 视觉增强」，或在校对页选用含 AI 的重提策略  
 
 Key 保存在本机 `literature-capture/data/ai_settings.json`（已 gitignore），也可通过环境变量：
 
@@ -158,7 +160,10 @@ export LITERATURE_AI_ENABLED=true
 | GET | `/api/papers/title?filename=` | 识别标题 |
 | POST | `/api/papers/session` | 确认标题 / 建文件夹 |
 | GET | `/api/pdf/{filename}` | 获取 PDF |
-| POST | `/api/capture` | 上传截图并提取 |
+| POST | `/api/capture` | 上传截图（**仅保存 PNG**，不提取） |
+| POST | `/api/capture/{slug}/extract-batch` | 批量提取本篇未提取截图 |
+| POST | `/api/capture/{slug}/{id}/extract` | 提取单张截图 |
+| POST | `/api/capture/{slug}/{id}/reextract` | 重新提取 |
 | GET | `/api/review/queue` | 校对队列 |
 | POST | `/api/review/item/{slug}/{id}/verdict` | 通过 / 不通过 |
 | POST | `/api/review/item/{slug}/{id}/reextract` | 重新提取 |
