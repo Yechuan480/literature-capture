@@ -992,6 +992,10 @@
         renderPaperList();
       }
 
+      RegionSelect.cancel();
+      RegionSelect.setActive(false);
+      $("btn-select")?.classList.remove("active");
+
       const g = Number(state.pendingGlobal?.total) || 0;
       setStatus(
         `已标记 table${result.table_id}（仅截图）· 全局待提取 ${g}`,
