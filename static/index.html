@@ -106,6 +106,12 @@
 
         <div class="status-bar">
           <span id="status-text">就绪</span>
+          <div id="extract-progress-inline" class="extract-progress-inline" hidden>
+            <div class="extract-progress-track thin" aria-hidden="true">
+              <div id="extract-progress-bar-inline" class="extract-progress-bar"></div>
+            </div>
+            <span id="extract-progress-inline-text" class="hint">0%</span>
+          </div>
         </div>
       </main>
 
@@ -127,6 +133,16 @@
           <div class="capture-actions">
             <button type="button" class="primary" id="btn-extract-batch-side" disabled>提取表格</button>
             <span class="hint" id="extract-pending-hint">全局待提取: 0</span>
+          </div>
+          <div id="extract-progress" class="extract-progress" hidden>
+            <div class="extract-progress-meta">
+              <span id="extract-progress-label">提取中…</span>
+              <span id="extract-progress-count">0/0</span>
+            </div>
+            <div class="extract-progress-track" aria-hidden="true">
+              <div id="extract-progress-bar" class="extract-progress-bar"></div>
+            </div>
+            <p class="hint extract-progress-detail" id="extract-progress-detail"></p>
           </div>
           <p class="hint" id="extract-paper-hint">本篇: —</p>
           <div class="capture-actions">

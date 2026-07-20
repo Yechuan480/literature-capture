@@ -20,6 +20,7 @@
     tableScanning: false,
     // Global unextracted marks across all papers
     pendingGlobal: { total: 0, papers: [], items: [] },
+    extracting: false,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -514,14 +515,16 @@
       ? localList.filter((c) => !c.extracted).length
       : paperPendingCount();
     const localTotal = localList.length;
-    const enabled = globalTotal > 0;
+    const enabled = globalTotal > 0 && !state.extracting;
     ["btn-extract-batch", "btn-extract-batch-side"].forEach((id) => {
       const btn = $(id);
       if (!btn) return;
       btn.disabled = !enabled;
-      btn.title = enabled
-        ? `批量提取全部 ${globalTotal} 处待处理标记（跨文献）`
-        : "暂无待提取标记";
+      btn.title = state.extracting
+        ? "正在提取…"
+        : enabled
+          ? `批量提取全部 ${globalTotal} 处待处理标记（跨文献）`
+          : "暂无待提取标记";
       const label =
         globalTotal > 0 ? `提取表格 (${globalTotal})` : "提取表格";
       btn.textContent = label;
@@ -993,8 +996,7 @@
       }
 
       RegionSelect.cancel();
-      RegionSelect.setActive(false);
-      $("btn-select")?.classList.remove("active");
+      // Stay in select mode for the next mark; only the blue rect is cleared
 
       const g = Number(state.pendingGlobal?.total) || 0;
       setStatus(
@@ -1008,10 +1010,57 @@
     }
   }
 
+  function setExtractProgress(opts) {
+    opts = opts || {};
+    const panel = $("extract-progress");
+    const inline = $("extract-progress-inline");
+    const label = $("extract-progress-label");
+    const count = $("extract-progress-count");
+    const detail = $("extract-progress-detail");
+    const bar = $("extract-progress-bar");
+    const barInline = $("extract-progress-bar-inline");
+    const inlineText = $("extract-progress-inline-text");
+
+    if (opts.hide) {
+      if (panel) panel.hidden = true;
+      if (inline) inline.hidden = true;
+      if (bar) bar.style.width = "0%";
+      if (barInline) barInline.style.width = "0%";
+      return;
+    }
+
+    const done = Math.max(0, Number(opts.done) || 0);
+    const total = Math.max(0, Number(opts.total) || 0);
+    const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+    const title = opts.label || "提取中…";
+    const detailText = opts.detail || "";
+
+    if (panel) panel.hidden = false;
+    if (inline) inline.hidden = false;
+    if (label) label.textContent = title;
+    if (count) count.textContent = total > 0 ? `${done}/${total}` : `${done}`;
+    if (detail) detail.textContent = detailText;
+    if (bar) bar.style.width = `${pct}%`;
+    if (barInline) barInline.style.width = `${pct}%`;
+    if (inlineText) inlineText.textContent = `${pct}%`;
+  }
+
   async function extractOne(tableId) {
     if (!state.paperSlug) return;
+    if (state.extracting) {
+      setStatus("已有提取任务在进行中", "warn");
+      return;
+    }
+    state.extracting = true;
+    updateExtractButtons(null);
     try {
-      showLoading(true, `提取 table${tableId}…`);
+      setExtractProgress({
+        done: 0,
+        total: 1,
+        label: "提取中…",
+        detail: `table${tableId}`,
+      });
+      setStatus(`提取 table${tableId}…`);
       const useAi = $("ai-toggle")?.checked ? "true" : "false";
       const result = await api(
         `/api/capture/${encodeURIComponent(state.paperSlug)}/${tableId}/extract?use_ai=${useAi}`,
@@ -1028,6 +1077,12 @@
         updateExtractButtons(result.captures || null);
         renderPaperList();
       }
+      setExtractProgress({
+        done: 1,
+        total: 1,
+        label: "提取完成",
+        detail: `table${tableId} · ${result.engine || ""}`,
+      });
       setStatus(
         `已提取 table${tableId}（${result.engine}，${result.rows}×${result.cols}）`,
         "ok"
@@ -1035,54 +1090,146 @@
     } catch (e) {
       setStatus(`提取失败: ${e.message}`, "warn");
     } finally {
-      showLoading(false);
+      state.extracting = false;
+      updateExtractButtons(null);
+      setTimeout(() => setExtractProgress({ hide: true }), 1200);
     }
   }
 
   async function extractBatch() {
-    const globalTotal = Number(state.pendingGlobal?.total) || 0;
-    if (globalTotal <= 0) {
-      setStatus("当前没有待提取的标记区域", "warn");
+    if (state.extracting) {
+      setStatus("已有提取任务在进行中", "warn");
       return;
     }
+    // Prefer live pending list so progress can advance item-by-item
+    let queue = Array.isArray(state.pendingGlobal?.items)
+      ? state.pendingGlobal.items.slice()
+      : [];
+    if (!queue.length) {
+      try {
+        const live = await api("/api/extract/pending");
+        applyPendingGlobal(live);
+        queue = Array.isArray(live.items) ? live.items.slice() : [];
+      } catch (_) {
+        /* fall through */
+      }
+    }
+    const total = queue.length;
+    if (total <= 0) {
+      setStatus("当前没有待提取的标记区域", "warn");
+      updateExtractButtons(null);
+      return;
+    }
+
+    state.extracting = true;
+    updateExtractButtons(null);
+    const useAi = $("ai-toggle")?.checked ? "true" : "false";
+    let ok = 0;
+    let failed = 0;
+    let lastOk = null;
+    const papersTouched = new Set();
+
     try {
-      showLoading(true, `批量提取全部 ${globalTotal} 处…`);
-      const useAi = $("ai-toggle")?.checked ? "true" : "false";
-      // Cross-paper: extract every unextracted mark
-      const result = await api(
-        `/api/extract/batch-all?use_ai=${useAi}`,
-        { method: "POST" }
-      );
-      if (result.pending_global) applyPendingGlobal(result.pending_global);
-      else await refreshPendingGlobal();
-      // Refresh current paper list if open
+      setExtractProgress({
+        done: 0,
+        total,
+        label: "批量提取中…",
+        detail: `共 ${total} 处`,
+      });
+      setStatus(`批量提取 0/${total}…`);
+
+      for (let i = 0; i < queue.length; i++) {
+        const item = queue[i];
+        const slug = item.paper_slug;
+        const tid = item.table_id;
+        const shortTitle =
+          (item.title || item.source_pdf || slug || "").slice(0, 48) || slug;
+        setExtractProgress({
+          done: i,
+          total,
+          label: "批量提取中…",
+          detail: `${shortTitle} · table${tid}`,
+        });
+        setStatus(`批量提取 ${i + 1}/${total} · ${shortTitle} · table${tid}`);
+        try {
+          const result = await api(
+            `/api/capture/${encodeURIComponent(slug)}/${tid}/extract?use_ai=${useAi}`,
+            { method: "POST" }
+          );
+          ok += 1;
+          papersTouched.add(slug);
+          lastOk = result;
+          if (result.pending_global) applyPendingGlobal(result.pending_global);
+          // Live-update current paper captures if same slug
+          if (state.paperSlug === slug) {
+            if (result.captures) renderCaptures(result.captures);
+            if (result.preview) {
+              state.lastResult = result;
+              renderPreview(result.preview);
+              renderPaths(result);
+            }
+          }
+          updateExtractButtons(null);
+          renderPaperList();
+        } catch (e) {
+          failed += 1;
+          console.warn("extract failed", slug, tid, e);
+        }
+        setExtractProgress({
+          done: i + 1,
+          total,
+          label: "批量提取中…",
+          detail: `${shortTitle} · table${tid}` + (failed ? ` · 失败 ${failed}` : ""),
+        });
+      }
+
+      // Final sync
+      await refreshPendingGlobal();
       if (state.paperSlug) await refreshCaptures();
       else updateExtractButtons(null);
       renderPaperList();
-      const lastOk = (result.results || []).slice(-1)[0];
-      if (lastOk) {
+      if (lastOk && state.paperSlug === lastOk.paper_slug) {
         state.lastResult = lastOk;
         renderPreview(lastOk.preview);
         renderPaths(lastOk);
       }
-      const errN = result.failed || 0;
+      setExtractProgress({
+        done: total,
+        total,
+        label: failed ? "提取完成（含失败）" : "提取完成",
+        detail: `成功 ${ok}/${total}` + (failed ? `，失败 ${failed}` : ""),
+      });
       setStatus(
-        `全局批量提取完成：成功 ${result.ok || 0}/${result.requested || 0}` +
-          (errN ? `，失败 ${errN}` : "") +
-          ` · 涉及 ${result.papers || 0} 篇`,
-        errN ? "warn" : "ok"
+        `全局批量提取完成：成功 ${ok}/${total}` +
+          (failed ? `，失败 ${failed}` : "") +
+          ` · 涉及 ${papersTouched.size} 篇`,
+        failed ? "warn" : "ok"
       );
     } catch (e) {
       setStatus(`批量提取失败: ${e.message}`, "warn");
     } finally {
-      showLoading(false);
+      state.extracting = false;
+      updateExtractButtons(null);
+      setTimeout(() => setExtractProgress({ hide: true }), 1800);
     }
   }
 
   async function reextract(tableId) {
     if (!state.paperSlug) return;
+    if (state.extracting) {
+      setStatus("已有提取任务在进行中", "warn");
+      return;
+    }
+    state.extracting = true;
+    updateExtractButtons(null);
     try {
-      showLoading(true, "重新提取…");
+      setExtractProgress({
+        done: 0,
+        total: 1,
+        label: "重新提取…",
+        detail: `table${tableId}`,
+      });
+      setStatus("重新提取…");
       const useAi = $("ai-toggle")?.checked ? "true" : "false";
       const result = await api(
         `/api/capture/${encodeURIComponent(state.paperSlug)}/${tableId}/reextract?use_ai=${useAi}`,
@@ -1099,11 +1246,19 @@
         updateExtractButtons(result.captures || null);
         renderPaperList();
       }
+      setExtractProgress({
+        done: 1,
+        total: 1,
+        label: "重新提取完成",
+        detail: `table${tableId} · ${result.engine || ""}`,
+      });
       setStatus(`已重新提取 table${tableId}（${result.engine}）`, "ok");
     } catch (e) {
       setStatus(`重提取失败: ${e.message}`, "warn");
     } finally {
-      showLoading(false);
+      state.extracting = false;
+      updateExtractButtons(null);
+      setTimeout(() => setExtractProgress({ hide: true }), 1200);
     }
   }
 
