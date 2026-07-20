@@ -18,6 +18,11 @@
     tableHitIndex: -1,
     tableScanToken: 0,
     tableScanning: false,
+    // Paddle pre-boxes: flat list {id,page,nx,ny,nw,nh,score}
+    preboxes: [],
+    preboxIndex: -1,
+    preboxToken: 0,
+    preboxScanning: false,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -102,6 +107,7 @@
     state.tableHitIndex = -1;
     state.tableScanToken += 1;
     state.tableScanning = false;
+    clearPreboxes();
     updateTitleUi();
     renderPreview(null);
     renderPaths(null);
@@ -115,6 +121,240 @@
     }
     updatePageUi();
     updateTableNavUi();
+  }
+
+  function clearPreboxes() {
+    state.preboxes = [];
+    state.preboxIndex = -1;
+    state.preboxToken += 1;
+    state.preboxScanning = false;
+    const layer = document.getElementById("prebox-layer");
+    if (layer) layer.innerHTML = "";
+    updatePreboxUi();
+  }
+
+  function updatePreboxUi() {
+    const label = $("prebox-label");
+    const prev = $("btn-prebox-prev");
+    const next = $("btn-prebox-next");
+    const del = $("btn-prebox-delete");
+    const n = state.preboxes.length;
+    const i = state.preboxIndex;
+    if (label) {
+      label.classList.toggle("scanning", !!state.preboxScanning);
+      label.classList.toggle("empty", !state.preboxScanning && n === 0);
+      if (state.preboxScanning) label.textContent = "检测中…";
+      else if (n === 0) label.textContent = "框 —";
+      else label.textContent = `框 ${i + 1}/${n}`;
+    }
+    if (prev) prev.disabled = n === 0 || state.preboxScanning;
+    if (next) next.disabled = n === 0 || state.preboxScanning;
+    if (del) del.disabled = n === 0 || i < 0 || state.preboxScanning;
+  }
+
+  function preboxEnabledForPaper(filename) {
+    const cfg = state.config || {};
+    const paddle = cfg.paddle || cfg.ocr || {};
+    const configured =
+      cfg.prebox_enabled !== false &&
+      (paddle.configured_enabled !== false ||
+        paddle.paddle_available ||
+        paddle.import_ok ||
+        cfg.ocr?.paddle_configured);
+    if (!configured) return false;
+    const p = state.papers.find((x) => x.filename === filename);
+    if (!p) return true;
+    const count = Number(p.capture_count) || 0;
+    if (count > 0) return false;
+    if (p.no_tables) return false;
+    return true;
+  }
+
+  function flattenDetectResult(result) {
+    const flat = [];
+    const pages = (result && result.pages) || [];
+    for (const pg of pages) {
+      const page = Number(pg.page) || 1;
+      for (const b of pg.boxes || []) {
+        flat.push({
+          id: b.id || `p${page}-${flat.length}`,
+          page,
+          nx: Number(b.nx),
+          ny: Number(b.ny),
+          nw: Number(b.nw),
+          nh: Number(b.nh),
+          score: Number(b.score) || 0,
+        });
+      }
+    }
+    flat.sort((a, b) => a.page - b.page || a.ny - b.ny || a.nx - b.nx);
+    return flat;
+  }
+
+  function paintPreboxLayer() {
+    const layer = document.getElementById("prebox-layer");
+    if (!layer) return;
+    layer.innerHTML = "";
+    if (!PdfViewer.state.ready) return;
+    const rot = Number(PdfViewer.state.rotation) || 0;
+    if (rot !== 0) {
+      // First version: server boxes are for unrotated pages
+      return;
+    }
+    const size =
+      typeof PdfViewer.getPageCssSize === "function"
+        ? PdfViewer.getPageCssSize()
+        : { width: 0, height: 0 };
+    const cssW = size.width;
+    const cssH = size.height;
+    if (!cssW || !cssH) return;
+
+    layer.style.width = `${cssW}px`;
+    layer.style.height = `${cssH}px`;
+
+    const page = PdfViewer.state.page || 1;
+    const frag = document.createDocumentFragment();
+    state.preboxes.forEach((b, idx) => {
+      if (b.page !== page) return;
+      const el = document.createElement("div");
+      el.className = "prebox-mark" + (idx === state.preboxIndex ? " current" : "");
+      el.style.left = `${b.nx * cssW}px`;
+      el.style.top = `${b.ny * cssH}px`;
+      el.style.width = `${b.nw * cssW}px`;
+      el.style.height = `${b.nh * cssH}px`;
+      const tag = document.createElement("span");
+      tag.className = "prebox-idx";
+      tag.textContent = String(idx + 1);
+      el.appendChild(tag);
+      frag.appendChild(el);
+    });
+    layer.appendChild(frag);
+  }
+
+  function applyCurrentPreboxSelection() {
+    if (state.preboxIndex < 0 || state.preboxIndex >= state.preboxes.length) {
+      return false;
+    }
+    const b = state.preboxes[state.preboxIndex];
+    const rot = Number(PdfViewer.state.rotation) || 0;
+    if (rot !== 0) {
+      setStatus("预框基于未旋转页；请将旋转调回 0° 后再用预框", "warn");
+      return false;
+    }
+    const size =
+      typeof PdfViewer.getPageCssSize === "function"
+        ? PdfViewer.getPageCssSize()
+        : { width: 0, height: 0 };
+    const cssW = size.width;
+    const cssH = size.height;
+    if (!cssW || !cssH) return false;
+    if (typeof RegionSelect.setSelectionCss !== "function") return false;
+    return RegionSelect.setSelectionCss({
+      x: b.nx * cssW,
+      y: b.ny * cssH,
+      w: b.nw * cssW,
+      h: b.nh * cssH,
+    });
+  }
+
+  async function jumpPrebox(delta) {
+    if (!state.preboxes.length) {
+      if (!state.preboxScanning && state.filename) {
+        await runPreboxDetect({ force: true, announce: true });
+      }
+      if (!state.preboxes.length) return;
+    }
+    let i = state.preboxIndex;
+    if (i < 0) i = delta > 0 ? 0 : state.preboxes.length - 1;
+    else i = (i + delta + state.preboxes.length) % state.preboxes.length;
+    state.preboxIndex = i;
+    const b = state.preboxes[i];
+    if (b && PdfViewer.state.page !== b.page) {
+      await PdfViewer.goTo(b.page);
+      updatePageUi();
+    }
+    paintPreboxLayer();
+    applyCurrentPreboxSelection();
+    updatePreboxUi();
+    setStatus(
+      `预框 ${i + 1}/${state.preboxes.length} · 第 ${b.page} 页 · score ${b.score.toFixed(2)}`
+    );
+  }
+
+  function deleteCurrentPrebox() {
+    if (state.preboxIndex < 0 || !state.preboxes.length) return;
+    const removed = state.preboxes.splice(state.preboxIndex, 1)[0];
+    if (state.preboxIndex >= state.preboxes.length) {
+      state.preboxIndex = state.preboxes.length - 1;
+    }
+    RegionSelect.cancel();
+    RegionSelect.setActive(false);
+    $("btn-select")?.classList.remove("active");
+    paintPreboxLayer();
+    updatePreboxUi();
+    if (state.preboxIndex >= 0) {
+      applyCurrentPreboxSelection();
+      setStatus(`已删除预框 · 剩余 ${state.preboxes.length}`);
+    } else {
+      setStatus("已删除全部预框");
+    }
+    void removed;
+  }
+
+  async function runPreboxDetect(opts) {
+    opts = opts || {};
+    if (!state.filename) return;
+    if (!opts.force && !preboxEnabledForPaper(state.filename)) {
+      clearPreboxes();
+      return;
+    }
+    const token = ++state.preboxToken;
+    state.preboxScanning = true;
+    updatePreboxUi();
+    if (opts.announce) setStatus("正在检测表格区域（PaddleX）…");
+    try {
+      const result = await api("/api/detect/tables", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: state.filename }),
+      });
+      if (token !== state.preboxToken) return;
+      state.preboxes = flattenDetectResult(result);
+      state.preboxIndex = state.preboxes.length ? 0 : -1;
+      state.preboxScanning = false;
+      updatePreboxUi();
+      paintPreboxLayer();
+      if (state.preboxIndex >= 0) {
+        const b = state.preboxes[0];
+        if (PdfViewer.state.page !== b.page) {
+          await PdfViewer.goTo(b.page);
+          updatePageUi();
+        }
+        applyCurrentPreboxSelection();
+      }
+      const warn =
+        result.warnings && result.warnings.length
+          ? ` · ${result.warnings.join("; ")}`
+          : "";
+      if (opts.announce || true) {
+        setStatus(
+          state.preboxes.length
+            ? `预框 ${state.preboxes.length} 处（${result.engine || "paddlex"}）${warn}`
+            : `未检测到表格区域${warn}`,
+          state.preboxes.length ? "ok" : "warn"
+        );
+      }
+    } catch (e) {
+      if (token !== state.preboxToken) return;
+      state.preboxScanning = false;
+      state.preboxes = [];
+      state.preboxIndex = -1;
+      updatePreboxUi();
+      paintPreboxLayer();
+      if (opts.announce !== false) {
+        setStatus(`预框检测不可用: ${e.message}`, "warn");
+      }
+    }
   }
 
   function updateTableNavUi() {
@@ -481,7 +721,12 @@
   async function loadConfig() {
     state.config = await api("/api/config");
     const ocr = state.config.ocr || {};
-    $("ocr-badge").textContent = `OCR: ${ocr.engine || "?"}`;
+    const paddle = state.config.paddle || {};
+    let badge = `OCR: ${ocr.engine || "?"}`;
+    if (paddle.import_ok || ocr.paddle_available) {
+      badge += paddle.paddle_detect || ocr.paddle_detect ? " · Paddle✓" : " · Paddle";
+    }
+    $("ocr-badge").textContent = badge;
     if (ocr.hint) setStatus(ocr.hint, "warn");
     applyAiUi(state.config.ai || { ready: state.config.ai_enabled });
   }
@@ -635,6 +880,7 @@
       state.tableHitIndex = -1;
       state.tableScanToken += 1;
       state.tableScanning = false;
+      clearPreboxes();
       updateTableNavUi();
       const known = state.papers.find((p) => p.filename === filename);
       if (known) {
@@ -670,6 +916,10 @@
       setStatus(`已打开: ${filename}`);
       // Non-blocking scan for table pages after first paint
       scanTablePages({ announce: true }).catch(() => {});
+      // Auto pre-box only for unannotated papers
+      if (preboxEnabledForPaper(filename)) {
+        runPreboxDetect({ announce: true }).catch(() => {});
+      }
     } catch (e) {
       setStatus(`打开失败: ${e.message}`, "warn");
     } finally {
@@ -841,6 +1091,25 @@
       await refreshCaptures();
       bumpPaperCaptureCount(state.filename, result.table_id);
 
+      // Remove accepted prebox if any (match by page + current index)
+      if (state.preboxIndex >= 0 && state.preboxes.length) {
+        const cur = state.preboxes[state.preboxIndex];
+        if (cur && cur.page === (PdfViewer.state.page || 1)) {
+          state.preboxes.splice(state.preboxIndex, 1);
+          if (state.preboxIndex >= state.preboxes.length) {
+            state.preboxIndex = state.preboxes.length - 1;
+          }
+          paintPreboxLayer();
+          updatePreboxUi();
+          if (state.preboxIndex >= 0) applyCurrentPreboxSelection();
+          else {
+            RegionSelect.cancel();
+            RegionSelect.setActive(false);
+            $("btn-select")?.classList.remove("active");
+          }
+        }
+      }
+
       const warn =
         result.warnings && result.warnings.length
           ? ` · 警告: ${result.warnings.join("; ")}`
@@ -975,6 +1244,16 @@
       }
       scanTablePages({ announce: true });
     });
+    $("btn-prebox-prev")?.addEventListener("click", () => jumpPrebox(-1));
+    $("btn-prebox-next")?.addEventListener("click", () => jumpPrebox(1));
+    $("btn-prebox-delete")?.addEventListener("click", () => deleteCurrentPrebox());
+    $("prebox-label")?.addEventListener("click", () => {
+      if (!PdfViewer.state.ready) {
+        setStatus("请先打开 PDF", "warn");
+        return;
+      }
+      runPreboxDetect({ force: true, announce: true });
+    });
     $("btn-select").addEventListener("click", toggleSelectMode);
     $("btn-capture").addEventListener("click", doCapture);
     $("btn-cancel-select").addEventListener("click", () => {
@@ -985,7 +1264,19 @@
     });
 
     document.addEventListener("pdf:rendered", () => {
-      RegionSelect.cancel();
+      // Keep prebox selection if same page; redraw layer
+      paintPreboxLayer();
+      const rot = Number(PdfViewer.state.rotation) || 0;
+      if (rot === 0 && state.preboxIndex >= 0) {
+        const b = state.preboxes[state.preboxIndex];
+        if (b && b.page === (PdfViewer.state.page || 1)) {
+          applyCurrentPreboxSelection();
+        } else {
+          RegionSelect.cancel();
+        }
+      } else {
+        RegionSelect.cancel();
+      }
       updatePageUi();
     });
 
@@ -1011,6 +1302,19 @@
         if (!PdfViewer.state.ready) return;
         e.preventDefault();
         jumpTableHit(e.shiftKey ? -1 : 1);
+      } else if (e.key === "[") {
+        if (!PdfViewer.state.ready) return;
+        e.preventDefault();
+        jumpPrebox(-1);
+      } else if (e.key === "]") {
+        if (!PdfViewer.state.ready) return;
+        e.preventDefault();
+        jumpPrebox(1);
+      } else if (e.key === "Backspace") {
+        if (!PdfViewer.state.ready || !state.preboxes.length) return;
+        // avoid deleting when select mode typing not applicable
+        e.preventDefault();
+        deleteCurrentPrebox();
       }
     });
   }

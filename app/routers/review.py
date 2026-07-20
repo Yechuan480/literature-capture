@@ -28,6 +28,11 @@ router = APIRouter(prefix="/api/review", tags=["review"])
 
 STRATEGIES = {
     "auto": {"label": "自动（当前默认引擎）", "force_engine": None, "use_ai": False},
+    "paddlex": {
+        "label": "PP-TableMagic (PaddleX)",
+        "force_engine": "paddlex",
+        "use_ai": False,
+    },
     "tesseract": {
         "label": "Tesseract + img2table",
         "force_engine": "img2table_tesseract",
@@ -35,6 +40,11 @@ STRATEGIES = {
     },
     "rapidocr": {"label": "RapidOCR 粗网格", "force_engine": "rapidocr", "use_ai": False},
     "ai": {"label": "仅 AI 视觉", "force_engine": "ai", "use_ai": True},
+    "paddlex_ai": {
+        "label": "PP-TableMagic + AI",
+        "force_engine": "paddlex",
+        "use_ai": True,
+    },
     "tesseract_ai": {
         "label": "Tesseract + AI 增强",
         "force_engine": "img2table_tesseract",

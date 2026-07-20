@@ -395,6 +395,15 @@
     }
   }
 
+  function getPageCssSize() {
+    const canvas = getCanvas();
+    if (!canvas) return { width: 0, height: 0 };
+    return {
+      width: canvas.clientWidth || parseFloat(canvas.style.width) || 0,
+      height: canvas.clientHeight || parseFloat(canvas.style.height) || 0,
+    };
+  }
+
   global.PdfViewer = {
     state,
     load,
@@ -410,5 +419,6 @@
     clearHighlights,
     clear,
     getCanvas,
+    getPageCssSize,
   };
 })(window);

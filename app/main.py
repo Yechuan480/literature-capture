@@ -11,18 +11,20 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings
 from app.models.schemas import HealthResponse
-from app.routers import capture, papers, review, settings as settings_router
+from app.routers import capture, detect, papers, review, settings as settings_router
 from app.services.ai_settings import ai_ready, public_ai_status
 from app.services.extract_table import ocr_status
+from app.services.paddle_runtime import paddle_status
 
 settings = get_settings()
 settings.ensure_dirs()
 
-app = FastAPI(title="Literature Table Capture", version="1.0.0")
+app = FastAPI(title="Literature Table Capture", version="1.1.0")
 app.include_router(papers.router)
 app.include_router(capture.router)
 app.include_router(settings_router.router)
 app.include_router(review.router)
+app.include_router(detect.router)
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -60,13 +62,17 @@ def health():
 @app.get("/api/config")
 def public_config():
     ai = public_ai_status()
+    ocr = ocr_status(settings)
+    pst = paddle_status(settings)
     return {
         "literature_root": str(settings.literature_root),
         "pdfs_root": str(settings.pdfs_root),
         "captures_root": str(settings.captures_root),
-        "ocr": ocr_status(settings),
+        "ocr": ocr,
         "ai_enabled": bool(ai.get("ready")),
         "ai": ai,
+        "paddle": pst,
+        "prebox_enabled": bool(settings.paddle_enabled),
     }
 
 

@@ -26,21 +26,30 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8765
    系统会尝试从元数据/首页/文件名识别，可手改后点 **确认标题**。  
    文件夹名会按标题生成安全 slug。
 
-3. **找表（推荐）**  
+3. **预框选（推荐，仅未标注文献）**  
+   - 打开 **尚未截取且未标「无表格」** 的 PDF 时，自动调用 PaddleX 检测表格区域  
+   - 工具栏 **‹框** / **框 n/m** / **框›**：跨页切换预框  
+   - **删框** 或 `Backspace`：丢弃当前预框  
+   - 当前预框会写入框选矩形，可 **拖角微调** 后直接 **确认截取**  
+   - 点中间「框 n/m」可强制重新检测；已截取 / 无表格的文献不自动预框  
+   - 页面旋转非 0° 时预框暂不映射（请先转回 0°）
+
+4. **Table 词跳转（辅助）**  
    - 打开后自动扫描含 `table` / `tables` 的页面  
    - 工具栏 **‹表** / **表›**，或快捷键 `T` / `Shift+T`  
    - 匹配词在页面上 **黄色高亮**  
    - 点中间 `Table n/m` 可重新扫描  
 
-4. **框选截取**  
-   - **框选模式** → 拖拽矩形 → **确认截取**  
+5. **框选截取**  
+   - 预框就绪后直接 **确认截取**，或 **框选模式** 手动拖拽  
    - 可选勾选「使用 AI 视觉增强」  
+   - 默认引擎优先 **PP-TableMagic**，失败回退 Tesseract / RapidOCR  
    - 输出：`_captures/{slug}/{slug}-tableN.png|.csv|.xlsx`
 
-5. **无表格**  
-   整篇没有可截表格时点 **无表格**，列表会标注并沉底。
+6. **无表格**  
+   整篇没有可截表格时点 **无表格**，列表会标注并沉底（不再自动预框）。
 
-6. **删除文献**  
+7. **删除文献**  
    侧栏 `×` 或标题栏 **删除文献**：删除 `pdfs/` 中 PDF 及对应 `_captures` 文件夹（不可恢复）。
 
 ### 快捷键
@@ -49,6 +58,8 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8765
 |----|------|
 | `←` / `→` | 上一页 / 下一页 |
 | `T` / `Shift+T` | 下一 / 上一 Table 页 |
+| `[` / `]` | 上一 / 下一预框 |
+| `Backspace` | 删除当前预框 |
 | `R` / `Shift+R` | 顺时针 / 逆时针旋转 90° |
 | `Esc` | 取消框选 |
 
@@ -62,7 +73,7 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8765
 2. 中间左右对比：原图 PNG | 提取表（可下 CSV/Excel）  
 3. **通过**：该项移出队列；该篇全部通过后整篇不再进入队列  
 4. **不通过**：可选策略重提后再核对  
-   - 自动 / Tesseract / RapidOCR / AI / 组合策略  
+   - 自动 / **PP-TableMagic** / Tesseract / RapidOCR / AI / 组合策略  
 5. **跳过**：先处理其他项  
 
 ### 快捷键
@@ -93,6 +104,12 @@ export LITERATURE_AI_ENABLED=true
 ---
 
 ## 常见问题
+
+**预框检测不可用 / 503**  
+确认已 `pip install paddlepaddle 'paddlex[ocr]'`，`config.yaml` 中 `paddle.enabled: true`，内存充足。首次会下载模型，可设 `PADDLE_PDX_MODEL_SOURCE=BOS`。健康检查：`GET /api/detect/status`。
+
+**预框与页面错位**  
+预框基于服务端未旋转页；请将旋转调回 0°，或点「框 n/m」重检。也可手动框选。
 
 **Table 扫描失败 / findPages is not a function**  
 强制刷新：`Cmd+Shift+R`（Windows：`Ctrl+Shift+R`）。

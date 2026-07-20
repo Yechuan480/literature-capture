@@ -1,13 +1,17 @@
 /**
  * Drag-to-select region over the PDF canvas and export PNG blob.
+ * Also supports programmatic selection (pre-box) and corner resize.
  */
 (function (global) {
   let active = false;
   let dragging = false;
+  let resizing = false;
+  let resizeHandle = null;
   let startX = 0;
   let startY = 0;
   let curX = 0;
   let curY = 0;
+  let hasSelection = false;
 
   function overlay() {
     return document.getElementById("select-overlay");
@@ -28,7 +32,9 @@
     ov.classList.toggle("active", active);
     if (!active) {
       dragging = false;
-      hideRect();
+      resizing = false;
+      resizeHandle = null;
+      // keep selection visible if pre-set; only hide when cancel()
     }
     document.dispatchEvent(new CustomEvent("region:mode", { detail: { active } }));
   }
@@ -41,7 +47,9 @@
     const r = rectEl();
     if (r) {
       r.style.display = "none";
+      r.classList.remove("has-handles");
     }
+    hasSelection = false;
   }
 
   function updateRect() {
@@ -53,6 +61,7 @@
     const h = Math.abs(curY - startY);
     if (w < 2 || h < 2) {
       r.style.display = "none";
+      hasSelection = false;
       return;
     }
     r.style.display = "block";
@@ -60,6 +69,7 @@
     r.style.top = `${y}px`;
     r.style.width = `${w}px`;
     r.style.height = `${h}px`;
+    hasSelection = true;
   }
 
   function getSelectionCss() {
@@ -69,6 +79,31 @@
     const h = Math.abs(curY - startY);
     if (w < 4 || h < 4) return null;
     return { x, y, w, h };
+  }
+
+  /**
+   * Programmatically set CSS selection (for pre-boxes).
+   * Activates select mode so crop works without re-drag.
+   */
+  function setSelectionCss(sel) {
+    if (!sel || sel.w < 4 || sel.h < 4) {
+      hideRect();
+      return false;
+    }
+    startX = sel.x;
+    startY = sel.y;
+    curX = sel.x + sel.w;
+    curY = sel.y + sel.h;
+    updateRect();
+    const r = rectEl();
+    if (r) r.classList.add("has-handles");
+    setActive(true);
+    const btn = document.getElementById("btn-select");
+    if (btn) btn.classList.add("active");
+    document.dispatchEvent(
+      new CustomEvent("region:selected", { detail: getSelectionCss() })
+    );
+    return true;
   }
 
   /**
@@ -111,34 +146,97 @@
     });
   }
 
+  function hitHandle(e) {
+    const sel = getSelectionCss();
+    if (!sel) return null;
+    const ov = overlay();
+    if (!ov) return null;
+    const bounds = ov.getBoundingClientRect();
+    const x = e.clientX - bounds.left;
+    const y = e.clientY - bounds.top;
+    const pad = 10;
+    const corners = {
+      nw: { x: sel.x, y: sel.y },
+      ne: { x: sel.x + sel.w, y: sel.y },
+      sw: { x: sel.x, y: sel.y + sel.h },
+      se: { x: sel.x + sel.w, y: sel.y + sel.h },
+    };
+    for (const [name, p] of Object.entries(corners)) {
+      if (Math.abs(x - p.x) <= pad && Math.abs(y - p.y) <= pad) return name;
+    }
+    return null;
+  }
+
   function onPointerDown(e) {
     if (!active) return;
     e.preventDefault();
     const ov = overlay();
     const bounds = ov.getBoundingClientRect();
+    const hx = hitHandle(e);
+    if (hx && hasSelection) {
+      resizing = true;
+      resizeHandle = hx;
+      const sel = getSelectionCss();
+      // anchor opposite corner
+      if (hx === "nw") {
+        startX = sel.x + sel.w;
+        startY = sel.y + sel.h;
+      } else if (hx === "ne") {
+        startX = sel.x;
+        startY = sel.y + sel.h;
+      } else if (hx === "sw") {
+        startX = sel.x + sel.w;
+        startY = sel.y;
+      } else {
+        startX = sel.x;
+        startY = sel.y;
+      }
+      curX = e.clientX - bounds.left;
+      curY = e.clientY - bounds.top;
+      ov.setPointerCapture?.(e.pointerId);
+      updateRect();
+      return;
+    }
     startX = e.clientX - bounds.left;
     startY = e.clientY - bounds.top;
     curX = startX;
     curY = startY;
     dragging = true;
+    resizing = false;
+    resizeHandle = null;
     ov.setPointerCapture?.(e.pointerId);
     updateRect();
   }
 
   function onPointerMove(e) {
-    if (!active || !dragging) return;
+    if (!active) return;
     const ov = overlay();
     const bounds = ov.getBoundingClientRect();
-    curX = Math.min(Math.max(0, e.clientX - bounds.left), bounds.width);
-    curY = Math.min(Math.max(0, e.clientY - bounds.top), bounds.height);
-    updateRect();
+    if (resizing || dragging) {
+      curX = Math.min(Math.max(0, e.clientX - bounds.left), bounds.width);
+      curY = Math.min(Math.max(0, e.clientY - bounds.top), bounds.height);
+      updateRect();
+      return;
+    }
+    // cursor feedback
+    const hx = hitHandle(e);
+    if (hx === "nw" || hx === "se") ov.style.cursor = "nwse-resize";
+    else if (hx === "ne" || hx === "sw") ov.style.cursor = "nesw-resize";
+    else ov.style.cursor = "crosshair";
   }
 
   function onPointerUp(e) {
-    if (!active || !dragging) return;
+    if (!active) return;
+    if (!dragging && !resizing) return;
     dragging = false;
+    resizing = false;
+    resizeHandle = null;
     updateRect();
-    document.dispatchEvent(new CustomEvent("region:selected", { detail: getSelectionCss() }));
+    const r = rectEl();
+    if (r && hasSelection) r.classList.add("has-handles");
+    document.dispatchEvent(
+      new CustomEvent("region:selected", { detail: getSelectionCss() })
+    );
   }
 
   function bind() {
@@ -153,6 +251,8 @@
 
   function cancel() {
     dragging = false;
+    resizing = false;
+    resizeHandle = null;
     hideRect();
     startX = startY = curX = curY = 0;
   }
@@ -164,5 +264,6 @@
     cropToPngBlob,
     cancel,
     getSelectionCss,
+    setSelectionCss,
   };
 })(window);

@@ -83,6 +83,15 @@
             <button type="button" id="btn-table-next" title="下一处 Table（快捷键 T）" disabled>表›</button>
           </div>
 
+          <div class="tb-divider" aria-hidden="true"></div>
+
+          <div class="tb-group tb-prebox-nav" role="group" aria-label="预框审阅">
+            <button type="button" id="btn-prebox-prev" title="上一预框（快捷键 [）" disabled>‹框</button>
+            <button type="button" id="prebox-label" class="badge prebox-badge" title="点击重新检测表格区域">框 —</button>
+            <button type="button" id="btn-prebox-next" title="下一预框（快捷键 ]）" disabled>框›</button>
+            <button type="button" id="btn-prebox-delete" class="ghost" title="删除当前预框（Backspace）" disabled>删框</button>
+          </div>
+
           <div class="tb-spacer"></div>
 
           <div class="tb-group tb-capture" role="group" aria-label="框选截取">
@@ -96,6 +105,7 @@
           <div class="canvas-stage">
             <canvas id="pdf-canvas"></canvas>
             <div id="highlight-layer" aria-hidden="true"></div>
+            <div id="prebox-layer" aria-hidden="true"></div>
             <div id="select-overlay">
               <div id="select-rect"></div>
             </div>
@@ -124,7 +134,7 @@
             <button type="button" class="ghost sm" id="btn-ai-settings">AI 设置</button>
           </div>
           <div class="capture-actions">
-            <span class="hint">快捷键：←/→ 翻页 · T/Shift+T 跳 Table · R/Shift+R 旋转 · Esc 取消框选</span>
+            <span class="hint">快捷键：←/→ 翻页 · T/Shift+T 跳 Table · [/] 预框 · R/Shift+R 旋转 · Esc 取消框选</span>
           </div>
         </div>
 

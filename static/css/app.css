@@ -514,12 +514,48 @@ button.no-tables-active {
   mix-blend-mode: multiply;
 }
 
+#prebox-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 2;
+  overflow: visible;
+}
+
+#prebox-layer .prebox-mark {
+  position: absolute;
+  border: 2px solid rgba(56, 189, 248, 0.75);
+  background: rgba(56, 189, 248, 0.12);
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.25);
+}
+
+#prebox-layer .prebox-mark.current {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.22);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.45);
+}
+
+#prebox-layer .prebox-mark .prebox-idx {
+  position: absolute;
+  left: 0;
+  top: -1.15rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #082f49;
+  background: var(--accent);
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
 #select-overlay {
   position: absolute;
   inset: 0;
   cursor: crosshair;
   display: none;
-  z-index: 2;
+  z-index: 3;
 }
 
 #select-overlay.active {
@@ -532,6 +568,68 @@ button.no-tables-active {
   background: var(--select);
   pointer-events: none;
   display: none;
+}
+
+#select-rect.has-handles::before,
+#select-rect.has-handles::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+  border: 1px solid #082f49;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+#select-rect.has-handles::before {
+  left: -6px;
+  top: -6px;
+  box-shadow:
+    calc(100% + 2px) 0 0 0 var(--accent),
+    0 calc(100% + 2px) 0 0 var(--accent),
+    calc(100% + 2px) calc(100% + 2px) 0 0 var(--accent);
+}
+
+/* corner markers via box-shadow on pseudo — use explicit children-like corners */
+#select-rect.has-handles {
+  box-shadow:
+    -5px -5px 0 0 #38bdf8,
+    calc(100% - 5px) -5px 0 0 #38bdf8,
+    -5px calc(100% - 5px) 0 0 #38bdf8,
+    calc(100% - 5px) calc(100% - 5px) 0 0 #38bdf8;
+}
+
+.viewer-toolbar .tb-prebox-nav button {
+  min-width: auto;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.viewer-toolbar .prebox-badge {
+  min-width: 4.2rem;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.viewer-toolbar .prebox-badge:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.1);
+}
+
+.viewer-toolbar .prebox-badge.scanning {
+  color: var(--warn);
+  cursor: wait;
+}
+
+.viewer-toolbar .prebox-badge.empty {
+  color: var(--muted);
 }
 
 .status-bar {

@@ -5,10 +5,22 @@ literature_root: null
 pdfs_subdir: pdfs
 
 ocr:
-  # auto | img2table_tesseract | rapidocr
+  # auto | paddlex | img2table_tesseract | rapidocr
+  # auto：优先 PP-TableMagic(paddlex) → Tesseract → RapidOCR
   engine: auto
   lang: eng+chi_sim
   upscale_min_side: 1000
+
+# PP-TableMagic / PaddleX（预框检测 + 表格识别）
+paddle:
+  enabled: true
+  device: cpu
+  detect_model: PicoDet_layout_1x_table
+  recognize_pipeline: table_recognition_v2
+  detect_dpi: 150
+  min_score: 0.4
+  # 全本检测最大页数，0=不限制
+  max_detect_pages: 0
 
 ai:
   # 默认关闭；可在网页右侧「AI 设置」启用并填写 Key（保存到 data/ai_settings.json）
