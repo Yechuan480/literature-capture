@@ -69,7 +69,12 @@ def save_ai_settings(
     if enabled is not None:
         current["enabled"] = bool(enabled)
     if base_url is not None:
-        current["base_url"] = (base_url or "").strip() or "https://api.openai.com/v1"
+        # Host-only URLs miss /v1 and hit the provider SPA (HTML 200 → JSON decode error).
+        from app.services.ai_vision import _normalize_base_url
+
+        current["base_url"] = _normalize_base_url(
+            (base_url or "").strip() or "https://api.openai.com/v1"
+        )
     if model is not None:
         current["model"] = (model or "").strip() or "gpt-4o"
     if clear_key:
