@@ -83,8 +83,9 @@ def extract_table_ai(
 
 def extract_table_ai_detailed(image_path: Path) -> dict[str, Any]:
     """
-    Returns {ok, matrix, error, model, usage_note}.
-    matrix is list[list[str]] on success.
+    Returns {ok, matrix, error, model, caption, notes}.
+    matrix is list[list[str]] on success; caption row prepended and notes
+    appended when the model provides them.
     """
     cfg = load_ai_settings()
     if not cfg.get("enabled"):
@@ -114,11 +115,18 @@ def extract_table_ai_detailed(image_path: Path) -> dict[str, Any]:
                 {
                     "role": "system",
                     "content": (
-                        "You extract scientific tables from images. "
-                        "Respond with ONLY a JSON 2D array of strings "
-                        "(array of rows; each row is an array of cell texts). "
-                        "Preserve visual reading order, merge multi-line cells with space, "
-                        "keep numbers and units as shown. No markdown fences, no commentary."
+                        "You extract scientific tables from images, including "
+                        "table title/caption (表题), column headers (表头), body cells, "
+                        "and footnotes/notes below the table (表后附注/脚注/来源说明). "
+                        "Respond with ONLY a JSON object (no markdown fences, no commentary):\n"
+                        '{"caption":"<table title or empty>",'
+                        '"matrix":[[...],[...]],'
+                        '"notes":"<footnotes or empty>"}\n'
+                        "matrix is a 2D string array: first row(s) = column headers, "
+                        "then data rows. Merge multi-line cells with space; keep numbers "
+                        "and units as shown; empty cells as \"\". "
+                        "If multiple tables appear, extract the main/largest one. "
+                        "You may also respond with only a 2D array for backward compatibility."
                     ),
                 },
                 {
@@ -127,8 +135,11 @@ def extract_table_ai_detailed(image_path: Path) -> dict[str, Any]:
                         {
                             "type": "text",
                             "text": (
-                                "Extract every cell of the main table in this image as a JSON "
-                                "2D string array. Empty cells as \"\"."
+                                "Extract the main table in this image. Include:\n"
+                                "1) caption/title above the table if present\n"
+                                "2) full column headers + all body cells\n"
+                                "3) footnotes/notes/source lines immediately below the table\n"
+                                "Return JSON object {caption, matrix, notes} as specified."
                             ),
                         },
                         {
@@ -139,7 +150,7 @@ def extract_table_ai_detailed(image_path: Path) -> dict[str, Any]:
                 },
             ],
             "temperature": 0,
-            "max_tokens": 4096,
+            "max_tokens": 8192,
         }
         req = urllib.request.Request(
             f"{base_url}/chat/completions",
@@ -152,7 +163,8 @@ def extract_table_ai_detailed(image_path: Path) -> dict[str, Any]:
                 resp.read(), content_type=resp.headers.get("content-type")
             )
         content = body["choices"][0]["message"]["content"]
-        matrix = _parse_matrix(content)
+        parsed = _parse_table_payload(content)
+        matrix = parsed.get("matrix")
         if not matrix:
             return {
                 "ok": False,
@@ -161,7 +173,14 @@ def extract_table_ai_detailed(image_path: Path) -> dict[str, Any]:
                 "model": model,
                 "raw_preview": (content or "")[:400],
             }
-        return {"ok": True, "matrix": matrix, "error": None, "model": model}
+        return {
+            "ok": True,
+            "matrix": matrix,
+            "error": None,
+            "model": model,
+            "caption": parsed.get("caption") or "",
+            "notes": parsed.get("notes") or "",
+        }
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", errors="replace")[:500]
         return {
@@ -237,21 +256,15 @@ def test_ai_connection() -> dict[str, Any]:
         }
 
 
-def _parse_matrix(content: str) -> list[list[str]] | None:
-    text = (content or "").strip()
+def _strip_fences(text: str) -> str:
+    text = (text or "").strip()
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
-    try:
-        data: Any = json.loads(text)
-    except json.JSONDecodeError:
-        m = re.search(r"\[.*\]", text, re.DOTALL)
-        if not m:
-            return None
-        try:
-            data = json.loads(m.group(0))
-        except json.JSONDecodeError:
-            return None
+    return text.strip()
+
+
+def _coerce_matrix(data: Any) -> list[list[str]] | None:
     if not isinstance(data, list) or not data:
         return None
     rows: list[list[str]] = []
@@ -261,3 +274,126 @@ def _parse_matrix(content: str) -> list[list[str]] | None:
         else:
             rows.append([str(row).strip()])
     return rows or None
+
+
+def _as_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        parts: list[str] = []
+        for item in value:
+            if isinstance(item, list):
+                parts.append(" ".join("" if c is None else str(c).strip() for c in item).strip())
+            else:
+                parts.append(str(item).strip())
+        return " ".join(p for p in parts if p).strip()
+    return str(value).strip()
+
+
+def _full_width_row(text: str, width: int) -> list[str]:
+    w = max(1, width)
+    row = [""] * w
+    row[0] = text
+    return row
+
+
+def _assemble_matrix(
+    *,
+    caption: str,
+    matrix: list[list[str]],
+    notes: str,
+) -> list[list[str]]:
+    width = max((len(r) for r in matrix), default=1)
+    width = max(width, 1)
+    out: list[list[str]] = []
+    cap = (caption or "").strip()
+    if cap:
+        # Avoid duplicating if model already put caption as first matrix row
+        first = " ".join(matrix[0]).strip() if matrix else ""
+        if first != cap and not first.startswith(cap[: min(40, len(cap))]):
+            out.append(_full_width_row(cap, width))
+    for row in matrix:
+        out.append(list(row) + [""] * (width - len(row)))
+    note = (notes or "").strip()
+    if note:
+        last = " ".join(out[-1]).strip() if out else ""
+        if last != note and note not in last:
+            # Multi-line notes → one row per line when short lines; else single row
+            lines = [ln.strip() for ln in re.split(r"[\r\n]+", note) if ln.strip()]
+            if len(lines) > 1 and all(len(ln) < 200 for ln in lines):
+                for ln in lines:
+                    out.append(_full_width_row(ln, width))
+            else:
+                out.append(_full_width_row(note, width))
+    return out
+
+
+def _parse_table_payload(content: str) -> dict[str, Any]:
+    """
+    Accept either:
+      - legacy 2D array matrix
+      - {caption, matrix, notes} object
+    Always returns matrix with caption (top) and notes (bottom) folded in when present.
+    """
+    text = _strip_fences(content)
+    data: Any = None
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        # Prefer object, then array
+        m_obj = re.search(r"\{.*\}", text, re.DOTALL)
+        m_arr = re.search(r"\[.*\]", text, re.DOTALL)
+        for m in (m_obj, m_arr):
+            if not m:
+                continue
+            try:
+                data = json.loads(m.group(0))
+                break
+            except json.JSONDecodeError:
+                continue
+    if data is None:
+        return {"matrix": None, "caption": "", "notes": ""}
+
+    caption = ""
+    notes = ""
+    matrix: list[list[str]] | None = None
+
+    if isinstance(data, dict):
+        caption = _as_text(
+            data.get("caption")
+            or data.get("title")
+            or data.get("table_title")
+            or data.get("表题")
+            or data.get("表头标题")
+        )
+        notes = _as_text(
+            data.get("notes")
+            or data.get("footnotes")
+            or data.get("footnote")
+            or data.get("footer")
+            or data.get("表注")
+            or data.get("附注")
+        )
+        raw_matrix = data.get("matrix") or data.get("table") or data.get("rows") or data.get("data")
+        matrix = _coerce_matrix(raw_matrix)
+        # Some models put headers separately
+        headers = data.get("headers") or data.get("header") or data.get("columns")
+        if matrix is not None and headers is not None:
+            if isinstance(headers, list) and headers and not isinstance(headers[0], list):
+                header_row = ["" if c is None else str(c).strip() for c in headers]
+                first = matrix[0] if matrix else []
+                if first != header_row:
+                    matrix = [header_row] + matrix
+    elif isinstance(data, list):
+        matrix = _coerce_matrix(data)
+
+    if not matrix:
+        return {"matrix": None, "caption": caption, "notes": notes}
+
+    assembled = _assemble_matrix(caption=caption, matrix=matrix, notes=notes)
+    return {"matrix": assembled, "caption": caption, "notes": notes}
+
+
+def _parse_matrix(content: str) -> list[list[str]] | None:
+    """Backward-compatible helper used by older call sites / tests."""
+    return _parse_table_payload(content).get("matrix")

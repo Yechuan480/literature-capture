@@ -438,7 +438,15 @@ def extract_table(
                 df = _df_from_matrix(ai_res["matrix"])
                 source = "ai_vision"
                 model = ai_res.get("model") or ""
-                warnings.append(f"已使用 AI 视觉结果{f'（{model}）' if model else ''}")
+                extras = []
+                if ai_res.get("caption"):
+                    extras.append("含表题")
+                if ai_res.get("notes"):
+                    extras.append("含附注")
+                extra = f"，{'/'.join(extras)}" if extras else ""
+                warnings.append(
+                    f"已使用 AI 视觉结果{f'（{model}）' if model else ''}{extra}"
+                )
             else:
                 warnings.append(f"AI: {ai_res.get('error') or '提取失败'}")
     else:
@@ -494,7 +502,15 @@ def extract_table(
                     df = df_ai
                     source = "ai_vision"
                     model = ai_res.get("model") or ""
-                    warnings.append(f"已使用 AI 视觉结果{f'（{model}）' if model else ''}")
+                    extras = []
+                    if ai_res.get("caption"):
+                        extras.append("含表题")
+                    if ai_res.get("notes"):
+                        extras.append("含附注")
+                    extra = f"，{'/'.join(extras)}" if extras else ""
+                    warnings.append(
+                        f"已使用 AI 视觉结果{f'（{model}）' if model else ''}{extra}"
+                    )
             elif use_ai:
                 warnings.append(f"AI: {ai_res.get('error') or '提取失败'}")
         elif use_ai and not ai_ready():
