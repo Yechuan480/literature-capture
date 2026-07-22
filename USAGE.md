@@ -28,12 +28,13 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8765
    **打开文献时会自动建会话**，不必先确认标题也能获取 SI / 标记截图。
 
 3. **补充材料 SI（自动）**  
-   - 打开 PDF 后后台解析 DOI（元数据 / 首页 / 文件名）→ 查询 Crossref 开放链接 → 过滤 SI/表格附件并下载到 `_captures/{slug}/si/`  
-   - **不会下载主文 PDF**；401/403/登录页记为付费墙失败，不绕过  
+   - 打开 PDF 后后台解析 DOI（元数据 / 首页 / 文件名）→ Crossref 开放链接 + **出版商页适配**（Elsevier CDN 探测、Springer/Nature HTML、Wiley/ACS 尽力）→ 过滤 SI/表格附件并下载到 `_captures/{slug}/si/`  
+   - **不会下载主文 PDF**；401/403/登录页记为付费墙失败，不绕过、不打验证码  
    - 标题栏可填 **DOI 或文章页 URL**，点 **获取 SI**（或 Enter）强制重试  
    - 徽章：`已下载` / `部分成功` / `失败` / `付费墙` / `无开放 SI`；右侧列表可点开已下文件  
    - 侧栏文献旁显示 `SI` / `SIn` 小标记  
-   - 配置：`config.yaml` → `si.enabled` / `si.auto_on_open`；关闭后不联网
+   - 配置：`config.yaml` → `si.enabled` / `si.auto_on_open`；关闭后不联网  
+   - 说明：部分 Wiley/ACS 站点对脚本返回 403，此类只能手填 SI 直链
 
 4. **Table 词跳转（辅助）**  
    - 打开后自动扫描含 `table` / `tables` 的页面  

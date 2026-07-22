@@ -9,12 +9,14 @@ from urllib.parse import unquote, urlparse
 SI_KEYWORDS = re.compile(
     r"(supplement|suppl(?:ementary)?|supporting[\s_-]?info|supporting[\s_-]?information|"
     r"\bsi\b|/si/|si\.|esi|/esm/|\besm\b|moesm|edata|mmc\d*|appendix|electronic[\s_-]?annex|"
-    r"additional[\s_-]?file|table[\s_-]?s\d|tables?[\s_-]?s\d|mediaobjects)",
+    r"additional[\s_-]?file|table[\s_-]?s\d|tables?[\s_-]?s\d|mediaobjects|"
+    r"downloadSupplement|suppl_file|/doi/suppl/|e-?component|ars\.els-cdn)",
     re.I,
 )
 TABLE_EXT = re.compile(r"\.(xlsx?|csv|tsv|ods)(\?|$)", re.I)
 ZIP_EXT = re.compile(r"\.(zip|tar\.gz|tgz|7z)(\?|$)", re.I)
 PDF_EXT = re.compile(r"\.pdf(\?|$)", re.I)
+DOC_EXT = re.compile(r"\.(docx?|pptx?|rtf)(\?|$)", re.I)
 MAIN_PDF_HINT = re.compile(
     r"(full[\s_-]?text|main[\s_-]?pdf|/pdf/main|article\.pdf|/pdfdirect/|/pdfft/)",
     re.I,
@@ -28,6 +30,8 @@ def classify_kind(url: str, content_type: str | None = None) -> str:
         return "si_xlsx" if "csv" not in ct and not u.lower().endswith(".csv") else "si_csv"
     if ZIP_EXT.search(u) or "zip" in ct or "compressed" in ct:
         return "si_zip"
+    if DOC_EXT.search(u) or "wordprocessingml" in ct or "msword" in ct or "presentationml" in ct:
+        return "si_doc"
     if PDF_EXT.search(u) or "pdf" in ct:
         if SI_KEYWORDS.search(u):
             return "si_pdf"
@@ -47,7 +51,7 @@ def looks_like_si(url: str, content_type: str | None = None, intended: str | Non
     ):
         return True
     kind = classify_kind(u, content_type)
-    if kind in ("si_xlsx", "si_csv", "si_zip", "si_pdf"):
+    if kind in ("si_xlsx", "si_csv", "si_zip", "si_pdf", "si_doc"):
         return True
     ct = (content_type or "").lower()
     if any(x in ct for x in ("spreadsheet", "excel", "csv", "zip")):
@@ -96,7 +100,7 @@ def filter_candidates(raw: list[dict[str, Any]], *, max_files: int = 15) -> list
             if kind == "main_pdf":
                 kind = "si_pdf"
             selected = True
-        elif kind in ("si_xlsx", "si_csv", "si_zip"):
+        elif kind in ("si_xlsx", "si_csv", "si_zip", "si_doc"):
             selected = True
         else:
             skip_reason = "not_si"
@@ -113,7 +117,7 @@ def filter_candidates(raw: list[dict[str, Any]], *, max_files: int = 15) -> list
 
     # Prefer table/zip over ambiguous
     def rank(c: dict[str, Any]) -> tuple:
-        order = {"si_xlsx": 0, "si_csv": 1, "si_zip": 2, "si_pdf": 3, "si_html": 4}
+        order = {"si_xlsx": 0, "si_csv": 1, "si_zip": 2, "si_pdf": 3, "si_doc": 4, "si_html": 5}
         return (0 if c.get("selected") else 1, order.get(c.get("kind") or "", 9), c.get("url") or "")
 
     out.sort(key=rank)

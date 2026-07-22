@@ -47,6 +47,7 @@ def filename_from_response(url: str, headers: dict[str, str], kind: str) -> str:
         "si_xlsx": ".xlsx",
         "si_csv": ".csv",
         "si_html": ".html",
+        "si_doc": ".docx",
     }.get(kind, ".bin")
     return _safe_name(f"si{ext}")
 

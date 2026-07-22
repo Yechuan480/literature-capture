@@ -168,7 +168,7 @@ def run_si_worker(job_id: str, payload: dict[str, Any]) -> None:
                 }
             )
 
-        # Phase 2 publisher hooks (no-op in P1)
+        # Phase 2: scrape publisher article HTML for SI links
         try:
             pub_links = discover_publisher_links(
                 doi=doi,
@@ -177,8 +177,25 @@ def run_si_worker(job_id: str, payload: dict[str, Any]) -> None:
                 settings=settings,
             )
             raw_links.extend(pub_links or [])
-        except Exception:
-            pass
+        except Exception as e:
+            with lock:
+                meta = load_meta(paper_dir) or meta
+                ensure_si_meta(meta)
+                meta["si"]["errors"].append(
+                    {
+                        "stage": "publisher",
+                        "url": landing,
+                        "code": None,
+                        "detail": str(e),
+                    }
+                )
+                _set_status(
+                    paper_dir,
+                    meta,
+                    "running",
+                    f"出版商页解析异常: {e}",
+                    job_id=job_id,
+                )
 
         max_files = int(settings.si_max_files_per_paper or 15)
         candidates = filter_candidates(raw_links, max_files=max_files)

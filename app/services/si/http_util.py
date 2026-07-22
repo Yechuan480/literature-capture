@@ -34,8 +34,11 @@ def get_client(settings: Settings | None = None) -> httpx.Client:
             _client = httpx.Client(
                 follow_redirects=True,
                 timeout=httpx.Timeout(settings.si_request_timeout_s, connect=15.0),
-                headers={"User-Agent": user_agent(settings)},
-                max_redirects=5,
+                headers={
+                    "User-Agent": user_agent(settings),
+                    "Accept-Language": "en-US,en;q=0.9",
+                },
+                max_redirects=8,
             )
         return _client
 
@@ -66,7 +69,12 @@ def request(
     settings = settings or get_settings()
     rate_limit_host(url, settings)
     client = get_client(settings)
-    hdrs = {"User-Agent": user_agent(settings)}
+    # Browser-like defaults help some publisher CDNs; still no login/cookies store
+    hdrs = {
+        "User-Agent": user_agent(settings),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
     if headers:
         hdrs.update(headers)
     return client.request(method, url, headers=hdrs)
