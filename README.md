@@ -17,6 +17,7 @@
 |------|------|
 | PDF 管理 | 扫描 `pdfs/`，侧栏检索/排序，删除文献 |
 | 标题识别 | PDF 元数据 → 首页正文 → 文件名（可手动修改） |
+| **补充材料 SI** | 打开文献自动解析 DOI → Crossref 开放链接 → 下载 SI/表格附件到 `_captures/{slug}/si/`；可手填 DOI/URL 重试 |
 | 预览与框选 | PDF.js 翻页 / 缩放 / 旋转；**手动**拖拽框选截图 |
 | Table 导航 | 自动扫描 `table`/`tables` 所在页，快捷跳转并高亮标注 |
 | **标记截图** | 确认截取仅保存 PNG（不即时 OCR）；侧栏统计本篇已标记区域 |
@@ -167,8 +168,12 @@ export LITERATURE_AI_ENABLED=true
 | GET | `/api/review/queue` | 校对队列 |
 | POST | `/api/review/item/{slug}/{id}/verdict` | 通过 / 不通过 |
 | POST | `/api/review/item/{slug}/{id}/reextract` | 重新提取 |
+| GET | `/api/si/status?filename=` 或 `slug=` | SI 状态 / 文件列表 / job |
+| POST | `/api/si/run` | 启动 SI 任务（body: filename, title?, doi?, url?, force?） |
+| GET | `/api/si/file/{slug}/{name}` | 下载已保存的 SI 文件 |
 
-`config.yaml` 中 `paddle.enabled` / `ocr.engine` 可控制默认引擎；`LITERATURE_PADDLE_ENABLED=false` 可关闭 Paddle。
+`config.yaml` 中 `paddle.enabled` / `ocr.engine` 可控制默认引擎；`LITERATURE_PADDLE_ENABLED=false` 可关闭 Paddle。  
+SI：`si.enabled` / `si.auto_on_open`；环境变量 `LITERATURE_SI_ENABLED`、`LITERATURE_SI_AUTO_ON_OPEN`、`LITERATURE_SI_CROSSREF_MAILTO`。
 
 ---
 
@@ -178,6 +183,7 @@ export LITERATURE_AI_ENABLED=true
 - **PDF**：PDF.js（前端）、pypdf / pdfplumber（标题）、pypdfium2（服务端栅格化）  
 - **表格识别**：[PaddleX](https://github.com/PaddlePaddle/PaddleX) PP-TableMagic（`table_recognition_v2`） 
 - **后备 OCR**：img2table + Tesseract；RapidOCR  
+- **SI 解析**：DOI 提取 + Crossref + httpx（开放链接；不绕过付费墙）  
 - **导出**：pandas + openpyxl  
 - **AI（可选）**：OpenAI 兼容视觉 Chat Completions  
 

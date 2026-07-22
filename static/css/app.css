@@ -484,6 +484,126 @@ button.no-tables-active {
   word-break: break-all;
 }
 
+.si-bar {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.si-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.si-row {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.si-row input[type="text"] {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.45rem 0.65rem;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+}
+
+.si-badge {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.si-badge.si-ok {
+  color: #14532d;
+  border-color: rgba(74, 222, 128, 0.55);
+  background: rgba(74, 222, 128, 0.15);
+}
+
+.si-badge.si-warn {
+  color: #78350f;
+  border-color: rgba(251, 191, 36, 0.55);
+  background: rgba(251, 191, 36, 0.14);
+}
+
+.si-badge.si-err {
+  color: #7f1d1d;
+  border-color: rgba(248, 113, 113, 0.55);
+  background: rgba(248, 113, 113, 0.14);
+}
+
+.si-badge.si-muted {
+  color: var(--muted);
+}
+
+.si-msg {
+  min-height: 1em;
+  word-break: break-word;
+}
+
+.si-file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.si-file-list li {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  background: var(--panel-2);
+}
+
+.si-file-list a.si-file-name {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.si-file-list a.si-file-name:hover {
+  text-decoration: underline;
+}
+
+.si-file-list .si-file-meta {
+  margin-top: 0.2rem;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.paper-list .si-dot {
+  font-size: 0.62rem;
+  padding: 0.08rem 0.32rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.paper-list .si-dot.si-ok {
+  color: #86efac;
+  border-color: rgba(74, 222, 128, 0.45);
+}
+
+.paper-list .si-dot.si-warn {
+  color: #fcd34d;
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
+.paper-list .si-dot.si-err {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.paper-list .si-dot.si-muted {
+  color: var(--muted);
+}
+
 .viewer-wrap {
   position: relative;
   flex: 1;

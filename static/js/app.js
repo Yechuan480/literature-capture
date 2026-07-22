@@ -21,6 +21,12 @@
     // Global unextracted marks across all papers
     pendingGlobal: { total: 0, papers: [], items: [] },
     extracting: false,
+    // SI / supplementary
+    doi: "",
+    url: "",
+    si: null,
+    siPollTimer: null,
+    siPollToken: 0,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -93,7 +99,16 @@
     if (del) del.disabled = !state.filename;
   }
 
+  function stopSiPoll() {
+    state.siPollToken += 1;
+    if (state.siPollTimer) {
+      clearTimeout(state.siPollTimer);
+      state.siPollTimer = null;
+    }
+  }
+
   function clearViewer() {
+    stopSiPoll();
     state.filename = null;
     state.title = "";
     state.titleSource = "";
@@ -105,7 +120,11 @@
     state.tableHitIndex = -1;
     state.tableScanToken += 1;
     state.tableScanning = false;
+    state.doi = "";
+    state.url = "";
+    state.si = null;
     updateTitleUi();
+    renderSiUi(null);
     renderPreview(null);
     renderPaths(null);
     renderCaptures([]);
@@ -371,6 +390,15 @@
         badge.title = "尚未处理";
         badge.textContent = "";
       }
+      const siN = Number(p.si_file_count) || 0;
+      const siSt = p.si_status || "";
+      if (siN > 0 || (siSt && siSt !== "idle" && siSt !== "disabled")) {
+        const siDot = document.createElement("span");
+        siDot.className = "si-dot " + siBadgeClass(siSt);
+        siDot.title = siStatusLabel(siSt) + (siN ? ` · ${siN} 文件` : "");
+        siDot.textContent = siN > 0 ? `SI${siN}` : "SI";
+        li.querySelector(".paper-actions").insertBefore(siDot, badge);
+      }
       const delBtn = li.querySelector(".btn-del-paper");
       delBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -612,6 +640,236 @@
     updateExtractButtons(items);
   }
 
+  function siStatusLabel(st) {
+    const map = {
+      idle: "未开始",
+      queued: "排队中",
+      running: "获取中",
+      ok: "已下载",
+      partial: "部分成功",
+      failed: "失败",
+      paywalled: "付费墙",
+      no_si: "无开放 SI",
+      disabled: "已关闭",
+    };
+    return map[st] || st || "—";
+  }
+
+  function siBadgeClass(st) {
+    if (st === "ok") return "si-ok";
+    if (st === "partial" || st === "running" || st === "queued") return "si-warn";
+    if (st === "failed" || st === "paywalled") return "si-err";
+    if (st === "no_si" || st === "disabled") return "si-muted";
+    return "";
+  }
+
+  function formatBytes(n) {
+    n = Number(n) || 0;
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  function parseDoiUrlInput(raw) {
+    const s = (raw || "").trim();
+    if (!s) return { doi: null, url: null };
+    if (/^https?:\/\//i.test(s)) {
+      const m = s.match(/10\.\d{4,9}\/[-._;()/:A-Z0-9]+/i);
+      return { doi: m ? m[0].replace(/[.,;]+$/, "") : null, url: s };
+    }
+    const m = s.match(/10\.\d{4,9}\/[-._;()/:A-Z0-9]+/i);
+    if (m) return { doi: m[0].replace(/[.,;]+$/, ""), url: null };
+    return { doi: s, url: null };
+  }
+
+  function renderSiUi(payload) {
+    const badge = $("si-badge");
+    const msg = $("si-msg");
+    const panel = $("si-panel-status");
+    const list = $("si-file-list");
+    const btn = $("btn-si-run");
+    const doiInp = $("doi-input");
+    const si = (payload && payload.si) || payload || null;
+    state.si = si;
+
+    if (payload && payload.doi) state.doi = payload.doi;
+    if (payload && payload.url) state.url = payload.url;
+    if (doiInp && document.activeElement !== doiInp) {
+      doiInp.value = state.doi || state.url || "";
+    }
+    if (btn) btn.disabled = !state.filename;
+
+    const st = (si && si.status) || "idle";
+    const label = siStatusLabel(st);
+    if (badge) {
+      badge.textContent = `SI: ${label}`;
+      badge.className = "badge si-badge " + siBadgeClass(st);
+      badge.title = (si && si.message) || label;
+    }
+    const text = (si && si.message) || "";
+    if (msg) msg.textContent = text;
+    if (panel) {
+      const n = ((si && si.files) || (payload && payload.files) || []).length;
+      panel.textContent =
+        text ||
+        (st === "idle"
+          ? "打开文献后自动检索开放 SI（Crossref）"
+          : `${label}${n ? ` · ${n} 个文件` : ""}`);
+    }
+
+    const files =
+      (payload && payload.files) ||
+      (si && si.files) ||
+      [];
+    if (list) {
+      if (!files.length) {
+        list.innerHTML = `<li class="empty">${
+          st === "running" || st === "queued"
+            ? "下载中…"
+            : st === "no_si"
+              ? "未找到开放补充材料"
+              : st === "paywalled"
+                ? "疑似付费墙，未能下载"
+                : "暂无文件"
+        }</li>`;
+      } else {
+        list.innerHTML = "";
+        const slug = state.paperSlug || (payload && payload.paper_slug) || "";
+        for (const f of files) {
+          const li = document.createElement("li");
+          const name = f.name || f.relpath || "file";
+          const href = slug
+            ? `/api/si/file/${encodeURIComponent(slug)}/${encodeURIComponent(name)}`
+            : "#";
+          li.innerHTML = `
+            <a class="si-file-name" href="${href}" target="_blank" rel="noopener"></a>
+            <div class="si-file-meta"></div>`;
+          li.querySelector(".si-file-name").textContent = name;
+          li.querySelector(".si-file-meta").textContent = [
+            f.kind,
+            formatBytes(f.bytes),
+            f.content_type,
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          list.appendChild(li);
+        }
+      }
+    }
+
+    if (state.filename && si) {
+      patchPaper(state.filename, {
+        doi: state.doi || null,
+        si_status: st,
+        si_file_count: files.length,
+        paper_slug: state.paperSlug || undefined,
+      });
+    }
+  }
+
+  function scheduleSiPoll() {
+    stopSiPoll();
+    const token = state.siPollToken;
+    const filename = state.filename;
+    if (!filename) return;
+    state.siPollTimer = setTimeout(async () => {
+      if (token !== state.siPollToken || state.filename !== filename) return;
+      try {
+        const st = await api(
+          `/api/si/status?filename=${encodeURIComponent(filename)}`
+        );
+        if (token !== state.siPollToken || state.filename !== filename) return;
+        if (st.paper_slug) state.paperSlug = st.paper_slug;
+        if (st.doi) state.doi = st.doi;
+        if (st.url) state.url = st.url;
+        renderSiUi(st);
+        const status = (st.si && st.si.status) || "";
+        if (status === "queued" || status === "running") {
+          scheduleSiPoll();
+        }
+      } catch (_) {
+        if (token === state.siPollToken) scheduleSiPoll();
+      }
+    }, 1500);
+  }
+
+  async function refreshSiStatus() {
+    if (!state.filename) {
+      renderSiUi(null);
+      return null;
+    }
+    const st = await api(
+      `/api/si/status?filename=${encodeURIComponent(state.filename)}`
+    );
+    if (st.paper_slug) state.paperSlug = st.paper_slug;
+    if (st.doi) state.doi = st.doi;
+    if (st.url) state.url = st.url;
+    if (st.title && !state.title) state.title = st.title;
+    renderSiUi(st);
+    const status = (st.si && st.si.status) || "";
+    if (status === "queued" || status === "running") scheduleSiPoll();
+    else stopSiPoll();
+    return st;
+  }
+
+  async function startSiAuto({ force = false } = {}) {
+    if (!state.filename) return;
+    const cfg = state.config && state.config.si;
+    if (cfg && cfg.enabled === false) {
+      renderSiUi({
+        si: { status: "disabled", message: "SI 功能已在配置中关闭", files: [] },
+      });
+      return;
+    }
+    if (!force && cfg && cfg.auto_on_open === false) {
+      await refreshSiStatus().catch(() => {});
+      return;
+    }
+    try {
+      const parsed = parseDoiUrlInput($("doi-input")?.value || state.doi || "");
+      const body = {
+        filename: state.filename,
+        title: state.title || null,
+        force: !!force,
+      };
+      if (parsed.doi) body.doi = parsed.doi;
+      if (parsed.url) body.url = parsed.url;
+      const res = await api("/api/si/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.paper_slug) state.paperSlug = res.paper_slug;
+      renderSiUi({
+        paper_slug: res.paper_slug,
+        doi: body.doi || state.doi,
+        si: {
+          status: res.si_status || "queued",
+          message: res.message || "",
+          files: [],
+        },
+      });
+      updateTitleUi();
+      const st = res.si_status || "";
+      if (st === "queued" || st === "running") scheduleSiPoll();
+      else await refreshSiStatus().catch(() => {});
+    } catch (e) {
+      setStatus(`SI 启动失败: ${e.message}`, "warn");
+      renderSiUi({
+        si: { status: "failed", message: e.message, files: [] },
+      });
+    }
+  }
+
+  async function runSiManual() {
+    if (!state.filename) {
+      setStatus("请先选择 PDF", "warn");
+      return;
+    }
+    setStatus("正在获取补充材料…");
+    await startSiAuto({ force: true });
+  }
+
   async function loadConfig() {
     state.config = await api("/api/config");
     const ocr = state.config.ocr || {};
@@ -769,6 +1027,7 @@
   async function openPaper(filename) {
     try {
       showLoading(true, "加载 PDF…");
+      stopSiPoll();
       state.filename = filename;
       state.paperSlug = null;
       state.folder = null;
@@ -778,16 +1037,34 @@
       state.tableHitIndex = -1;
       state.tableScanToken += 1;
       state.tableScanning = false;
+      state.doi = "";
+      state.url = "";
+      state.si = null;
       updateTableNavUi();
       const known = state.papers.find((p) => p.filename === filename);
       if (known) {
         state.noTables = !!known.no_tables;
         state.paperSlug = known.paper_slug || null;
         if (known.title) state.title = known.title;
+        if (known.doi) state.doi = known.doi;
       }
       renderPaperList();
       renderPreview(null);
       renderPaths(null);
+      renderSiUi(
+        known
+          ? {
+              doi: known.doi,
+              paper_slug: known.paper_slug,
+              si: {
+                status: known.si_status || "idle",
+                message: "",
+                files: [],
+              },
+              files: [],
+            }
+          : null
+      );
       // Keep global pending badge; only clear local list until slug known
       renderCaptures([]);
       updateExtractButtons([]);
@@ -813,8 +1090,9 @@
       RegionSelect.setActive(false);
       $("btn-select").classList.remove("active");
       setStatus(`已打开: ${filename}`);
-      // Non-blocking scan for table pages after first paint
+      // Non-blocking: table page scan + SI auto-fetch (no title confirm required)
       scanTablePages({ announce: true }).catch(() => {});
+      startSiAuto({ force: false }).catch(() => {});
     } catch (e) {
       setStatus(`打开失败: ${e.message}`, "warn");
     } finally {
@@ -1272,6 +1550,15 @@
     $("btn-no-tables")?.addEventListener("click", toggleNoTables);
     $("btn-delete-paper")?.addEventListener("click", () => {
       if (state.filename) deletePaper(state.filename);
+    });
+    $("btn-si-run")?.addEventListener("click", () => {
+      runSiManual().catch((e) => setStatus(e.message, "warn"));
+    });
+    $("doi-input")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        runSiManual().catch((err) => setStatus(err.message, "warn"));
+      }
     });
     $("btn-ai-settings")?.addEventListener("click", async () => {
       toggleAiPanel(true);

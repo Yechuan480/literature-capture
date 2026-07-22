@@ -22,22 +22,31 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8765
    左侧列表点选；可用搜索框按标题/文件名筛选。  
    排序：未处理 → 无表格 → 已截取。
 
-2. **确认标题**  
+2. **确认标题（可选）**  
    系统会尝试从元数据/首页/文件名识别，可手改后点 **确认标题**。  
-   文件夹名会按标题生成安全 slug。
+   文件夹名会按标题生成安全 slug。  
+   **打开文献时会自动建会话**，不必先确认标题也能获取 SI / 标记截图。
 
-3. **Table 词跳转（辅助）**  
+3. **补充材料 SI（自动）**  
+   - 打开 PDF 后后台解析 DOI（元数据 / 首页 / 文件名）→ 查询 Crossref 开放链接 → 过滤 SI/表格附件并下载到 `_captures/{slug}/si/`  
+   - **不会下载主文 PDF**；401/403/登录页记为付费墙失败，不绕过  
+   - 标题栏可填 **DOI 或文章页 URL**，点 **获取 SI**（或 Enter）强制重试  
+   - 徽章：`已下载` / `部分成功` / `失败` / `付费墙` / `无开放 SI`；右侧列表可点开已下文件  
+   - 侧栏文献旁显示 `SI` / `SIn` 小标记  
+   - 配置：`config.yaml` → `si.enabled` / `si.auto_on_open`；关闭后不联网
+
+4. **Table 词跳转（辅助）**  
    - 打开后自动扫描含 `table` / `tables` 的页面  
    - 工具栏 **‹表** / **表›**，或快捷键 `T` / `Shift+T`  
    - 匹配词在页面上 **黄色高亮**  
    - 点中间 `Table n/m` 可重新扫描  
 
-4. **框选截取（仅保存）**  
+5. **框选截取（仅保存）**  
    - **框选模式** 手动拖拽表格区域 → **确认截取**  
    - **此时不跑 OCR**：只写入 `{slug}-tableN.png` 并记入「本篇已标记」  
    - 可连续标记多页多处，右侧显示本篇 `n/m 待提取`
 
-5. **批量提取**  
+6. **批量提取**  
    - 可跨多篇连续标记：每确认截取一次，**全局待提取**计数累加（切换文献不会清零）  
    - 本篇或全部标完后，点工具栏或右侧 **提取表格 (N)** → 对**所有文献**的未提取截图依次识别  
    - 默认优先 **PP-TableMagic**，失败回退 Tesseract / RapidOCR；可选「提取时使用 AI 视觉增强」  
@@ -45,11 +54,11 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8765
    - 列表单项也可点 **提取** / **重新提取**（仅当前篇）  
    - 侧栏徽章 `count/pending` 表示该篇已标记数 / 仍待提取数
 
-6. **无表格**  
+7. **无表格**  
    整篇没有可截表格时点 **无表格**，列表会标注并沉底。
 
-7. **删除文献**  
-   侧栏 `×` 或标题栏 **删除文献**：删除 `pdfs/` 中 PDF 及对应 `_captures` 文件夹（不可恢复）。
+8. **删除文献**  
+   侧栏 `×` 或标题栏 **删除文献**：删除 `pdfs/` 中 PDF 及对应 `_captures` 文件夹（不可恢复，含 `si/`）。
 
 ### 快捷键
 
@@ -105,7 +114,7 @@ export LITERATURE_AI_ENABLED=true
 **批量提取 / Paddle 不可用**  
 确认已 `pip install paddlepaddle 'paddlex[ocr]'`，`config.yaml` 中 `paddle.enabled: true`，内存充足。首次会下载模型，可设 `PADDLE_PDX_MODEL_SOURCE=BOS`。健康检查：`GET /api/health`。无 Paddle 时会回退 Tesseract / RapidOCR。
 
-**Table 扫描失败 / findPages is not a function** 
+**Table 扫描失败 / findPages is not a function**  
 强制刷新：`Cmd+Shift+R`（Windows：`Ctrl+Shift+R`）。
 
 **Table 0 / 无高亮**  
@@ -113,6 +122,9 @@ export LITERATURE_AI_ENABLED=true
 
 **OCR 效果差**  
 安装 Tesseract：`brew install tesseract tesseract-lang`；或在校对页换 RapidOCR / AI 重提。
+
+**SI 一直失败 / 无开放 SI**  
+确认 PDF 含 DOI，或手填 DOI/文章页 URL 后点「获取 SI」。付费墙文章只能记录失败，不会绕过。可在 `config.yaml` 填写 `si.crossref_mailto` 加入 Crossref 礼貌池。
 
 **列表里有重复文献**  
 用删除按钮去掉多余 PDF；截取结果会一并清理。
@@ -133,6 +145,7 @@ $LITERATURE_ROOT/
 ├── pdfs/                 # 你的 PDF（不进仓库）
 └── _captures/
     └── {paper_slug}/
-        ├── meta.json     # 标题、计数、校对状态
+        ├── meta.json     # 标题、DOI、SI 状态、计数、校对状态
+        ├── si/           # 自动下载的补充材料
         └── {slug}-tableN.png / .csv / .xlsx
 ```

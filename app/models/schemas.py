@@ -16,6 +16,9 @@ class PaperItem(BaseModel):
     paper_slug: str | None = None
     no_tables: bool = False
     title: str | None = None
+    doi: str | None = None
+    si_status: str | None = None
+    si_file_count: int = 0
 
 
 class TitleResponse(BaseModel):
@@ -79,3 +82,11 @@ class HealthResponse(BaseModel):
     ocr: dict[str, Any]
     ai_enabled: bool
     pdfs_root: str | None = None
+
+
+class SiRunRequest(BaseModel):
+    filename: str
+    title: str | None = None
+    doi: str | None = None
+    url: str | None = None
+    force: bool = False

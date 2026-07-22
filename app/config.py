@@ -46,6 +46,7 @@ def get_settings() -> "Settings":
     ai = raw.get("ai") or {}
     server = raw.get("server") or {}
     paddle = raw.get("paddle") or {}
+    si = raw.get("si") or {}
 
     ai_enabled = _env_bool(
         "LITERATURE_AI_ENABLED",
@@ -58,6 +59,15 @@ def get_settings() -> "Settings":
     paddle_enabled = _env_bool(
         "LITERATURE_PADDLE_ENABLED",
         str(paddle.get("enabled", True)).lower() in ("1", "true", "yes", "on"),
+    )
+
+    si_enabled = _env_bool(
+        "LITERATURE_SI_ENABLED",
+        str(si.get("enabled", True)).lower() in ("1", "true", "yes", "on"),
+    )
+    si_auto = _env_bool(
+        "LITERATURE_SI_AUTO_ON_OPEN",
+        str(si.get("auto_on_open", True)).lower() in ("1", "true", "yes", "on"),
     )
 
     return Settings(
@@ -85,6 +95,22 @@ def get_settings() -> "Settings":
         paddle_detect_dpi=int(paddle.get("detect_dpi") or 150),
         paddle_min_score=float(paddle.get("min_score") or 0.4),
         paddle_max_detect_pages=int(paddle.get("max_detect_pages") or 0),
+        si_enabled=si_enabled,
+        si_auto_on_open=si_auto,
+        si_user_agent=str(
+            si.get("user_agent")
+            or "literature-capture/1.3 (local research tool; +https://github.com/Yechuan480/literature-capture)"
+        ),
+        si_request_timeout_s=float(si.get("request_timeout_s") or 30),
+        si_max_file_mb=float(si.get("max_file_mb") or 80),
+        si_min_interval_ms=int(si.get("min_interval_ms") or 800),
+        si_max_concurrent_jobs=int(si.get("max_concurrent_jobs") or 2),
+        si_max_files_per_paper=int(si.get("max_files_per_paper") or 15),
+        si_crossref_mailto=str(
+            os.getenv("LITERATURE_SI_CROSSREF_MAILTO")
+            or si.get("crossref_mailto")
+            or ""
+        ).strip(),
     )
 
 
@@ -112,6 +138,15 @@ class Settings:
         paddle_detect_dpi: int = 150,
         paddle_min_score: float = 0.4,
         paddle_max_detect_pages: int = 0,
+        si_enabled: bool = True,
+        si_auto_on_open: bool = True,
+        si_user_agent: str = "literature-capture/1.3",
+        si_request_timeout_s: float = 30.0,
+        si_max_file_mb: float = 80.0,
+        si_min_interval_ms: int = 800,
+        si_max_concurrent_jobs: int = 2,
+        si_max_files_per_paper: int = 15,
+        si_crossref_mailto: str = "",
     ) -> None:
         self.app_root = app_root
         self.literature_root = literature_root
@@ -133,6 +168,15 @@ class Settings:
         self.paddle_detect_dpi = paddle_detect_dpi
         self.paddle_min_score = paddle_min_score
         self.paddle_max_detect_pages = paddle_max_detect_pages
+        self.si_enabled = si_enabled
+        self.si_auto_on_open = si_auto_on_open
+        self.si_user_agent = si_user_agent
+        self.si_request_timeout_s = si_request_timeout_s
+        self.si_max_file_mb = si_max_file_mb
+        self.si_min_interval_ms = si_min_interval_ms
+        self.si_max_concurrent_jobs = si_max_concurrent_jobs
+        self.si_max_files_per_paper = si_max_files_per_paper
+        self.si_crossref_mailto = si_crossref_mailto
 
     def ensure_dirs(self) -> None:
         self.captures_root.mkdir(parents=True, exist_ok=True)

@@ -11,7 +11,7 @@
       <aside class="sidebar">
         <div class="panel-header">
           <h1>文献表格截取</h1>
-          <p>选择 PDF → 确认标题 → 框选截图保存 → 批量提取表格</p>
+          <p>选择 PDF → 自动建会话 / 获取 SI → 框选截图 → 批量提取</p>
           <p class="hint"><a href="/review" style="color: var(--accent)">→ 进入表格校对</a></p>
         </div>
         <div class="sidebar-tools">
@@ -46,6 +46,21 @@
             <span id="title-source"></span>
             ·
             <span id="slug-preview">预览 slug: —</span>
+          </div>
+          <div class="si-bar">
+            <label for="doi-input" class="si-label">DOI / 文章页 URL</label>
+            <div class="si-row">
+              <input
+                type="text"
+                id="doi-input"
+                placeholder="打开后自动解析 DOI；失败可手填 DOI 或 https://…"
+                spellcheck="false"
+                autocomplete="off"
+              />
+              <span class="badge si-badge" id="si-badge" title="补充材料状态">SI: —</span>
+              <button type="button" id="btn-si-run" title="获取或重试补充材料" disabled>获取 SI</button>
+            </div>
+            <div class="si-msg hint" id="si-msg"></div>
           </div>
         </div>
 
@@ -193,6 +208,14 @@
             </div>
             <div class="hint" id="ai-settings-msg"></div>
           </div>
+        </div>
+
+        <div class="right-section">
+          <h3>补充材料 SI</h3>
+          <p class="hint" id="si-panel-status">打开文献后自动检索开放 SI（Crossref）</p>
+          <ul class="si-file-list" id="si-file-list">
+            <li class="empty">暂无文件</li>
+          </ul>
         </div>
 
         <div class="right-section">

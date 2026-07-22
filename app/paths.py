@@ -102,6 +102,9 @@ def capture_stats_by_source_pdf(settings: Settings | None = None) -> dict[str, d
         caps = list_captures(child, meta) if png_n else []
         pending = sum(1 for c in caps if not c.get("extracted"))
         prev = out.get(src)
+        si = meta.get("si") if isinstance(meta.get("si"), dict) else {}
+        si_status = str(si.get("status") or "idle")
+        si_files = si.get("files") if isinstance(si.get("files"), list) else []
         if prev is None or count >= int(prev.get("count") or 0):
             out[src] = {
                 "count": count,
@@ -109,6 +112,9 @@ def capture_stats_by_source_pdf(settings: Settings | None = None) -> dict[str, d
                 "paper_slug": slug,
                 "no_tables": bool(meta.get("no_tables")),
                 "title": meta.get("title") or "",
+                "doi": meta.get("doi") or None,
+                "si_status": si_status,
+                "si_file_count": len(si_files),
             }
     return out
 
@@ -214,6 +220,9 @@ def list_pdfs(settings: Settings | None = None) -> list[dict[str, Any]]:
                     "paper_slug": st.get("paper_slug"),
                     "no_tables": bool(st.get("no_tables")),
                     "title": (st.get("title") or "") or None,
+                    "doi": st.get("doi") or None,
+                    "si_status": st.get("si_status") or None,
+                    "si_file_count": int(st.get("si_file_count") or 0),
                 }
             )
 
@@ -328,6 +337,97 @@ def find_capture_dirs_for_pdf(
         if meta and meta.get("source_pdf") == filename:
             found.append(child)
     return found
+
+
+def default_si_meta() -> dict[str, Any]:
+    return {
+        "status": "idle",
+        "message": "",
+        "started_at": None,
+        "finished_at": None,
+        "job_id": None,
+        "resolved_title": None,
+        "publisher": None,
+        "container_title": None,
+        "candidates": [],
+        "files": [],
+        "errors": [],
+        "stats": {"candidates": 0, "downloaded": 0, "skipped": 0, "failed": 0},
+    }
+
+
+def ensure_si_meta(meta: dict[str, Any]) -> dict[str, Any]:
+    """Ensure meta has si block; mutates and returns meta."""
+    if not isinstance(meta.get("si"), dict):
+        meta["si"] = default_si_meta()
+    else:
+        base = default_si_meta()
+        for k, v in base.items():
+            meta["si"].setdefault(k, v)
+    return meta
+
+
+def ensure_paper_session(
+    filename: str,
+    title: str | None = None,
+    settings: Settings | None = None,
+) -> tuple[Path, dict[str, Any]]:
+    """
+    Create or reuse _captures folder for PDF without requiring prior UI title confirm.
+    Prefer existing meta by source_pdf; else allocate with provided/extracted title.
+    """
+    settings = settings or get_settings()
+    safe_pdf_path(filename, settings)
+    existing = find_capture_dirs_for_pdf(filename, settings)
+    if existing:
+        # Prefer newest by updated_at
+        def _key(p: Path) -> str:
+            m = load_meta(p) or {}
+            return str(m.get("updated_at") or m.get("created_at") or "")
+
+        paper_dir = sorted(existing, key=_key, reverse=True)[0]
+        meta = load_meta(paper_dir) or {}
+        ensure_si_meta(meta)
+        if title and title.strip():
+            t = clean_display_title(title)
+            if t and t != meta.get("title"):
+                # Only update display title; keep slug stable
+                meta["title"] = t
+                meta["updated_at"] = utc_now_iso()
+                save_meta(paper_dir, meta)
+        else:
+            save_meta(paper_dir, meta)
+        return paper_dir, meta
+
+    if not title or not str(title).strip():
+        from app.services.title import extract_title
+
+        title = extract_title(safe_pdf_path(filename, settings))["title"]
+    paper_dir, meta = allocate_paper_dir(title, filename, settings)
+    ensure_si_meta(meta)
+    save_meta(paper_dir, meta)
+    return paper_dir, meta
+
+
+def si_dir(paper_dir: Path) -> Path:
+    d = paper_dir / "si"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def safe_si_file(paper_dir: Path, name: str) -> Path:
+    """Resolve a basename under paper_dir/si with path-traversal guard."""
+    if not name or "/" in name or "\\" in name or name in (".", ".."):
+        raise HTTPException(status_code=400, detail="非法文件名")
+    if name != Path(name).name:
+        raise HTTPException(status_code=400, detail="非法文件名")
+    root = (paper_dir / "si").resolve()
+    path = (root / name).resolve()
+    if not is_under(path, root):
+        raise HTTPException(status_code=400, detail="非法路径")
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    return path
 
 
 def delete_paper(

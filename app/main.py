@@ -11,7 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings
 from app.models.schemas import HealthResponse
-from app.routers import capture, detect, papers, review, settings as settings_router
+from app.routers import capture, detect, papers, review, settings as settings_router, si
 from app.services.ai_settings import ai_ready, public_ai_status
 from app.services.extract_table import ocr_status
 from app.services.paddle_runtime import paddle_status
@@ -19,12 +19,13 @@ from app.services.paddle_runtime import paddle_status
 settings = get_settings()
 settings.ensure_dirs()
 
-app = FastAPI(title="Literature Table Capture", version="1.2.0")
+app = FastAPI(title="Literature Table Capture", version="1.3.0")
 app.include_router(papers.router)
 app.include_router(capture.router)
 app.include_router(settings_router.router)
 app.include_router(review.router)
 app.include_router(detect.router)
+app.include_router(si.router)
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -72,6 +73,10 @@ def public_config():
         "ai_enabled": bool(ai.get("ready")),
         "ai": ai,
         "paddle": pst,
+        "si": {
+            "enabled": bool(settings.si_enabled),
+            "auto_on_open": bool(settings.si_auto_on_open),
+        },
     }
 
 
