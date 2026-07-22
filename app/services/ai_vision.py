@@ -12,6 +12,22 @@ from typing import Any
 
 from app.services.ai_settings import load_ai_settings
 
+# Cloudflare (error 1010) blocks bare Python-urllib UA on many API gateways.
+_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/122.0.0.0 Safari/537.36 literature-capture/1.0"
+)
+
+
+def _api_headers(api_key: str) -> dict[str, str]:
+    return {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+        "User-Agent": _UA,
+        "Accept": "application/json",
+    }
+
 
 def extract_table_ai(
     image_path: Path,
@@ -85,10 +101,7 @@ def extract_table_ai_detailed(image_path: Path) -> dict[str, Any]:
         req = urllib.request.Request(
             f"{base_url}/chat/completions",
             data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}",
-            },
+            headers=_api_headers(api_key),
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=120) as resp:
@@ -143,10 +156,7 @@ def test_ai_connection() -> dict[str, Any]:
         req = urllib.request.Request(
             f"{base_url}/chat/completions",
             data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}",
-            },
+            headers=_api_headers(api_key),
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=45) as resp:
@@ -155,7 +165,14 @@ def test_ai_connection() -> dict[str, Any]:
         return {"ok": True, "model": model, "reply": (content or "").strip()[:80]}
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", errors="replace")[:400]
-        return {"ok": False, "error": f"HTTP {e.code}: {detail}", "model": model}
+        hint = ""
+        if e.code == 403 and "1010" in detail:
+            hint = "（Cloudflare 1010：网关按浏览器指纹拦请求；已带 UA，若仍失败请换 Base URL/代理或检查 IP 是否被封）"
+        return {
+            "ok": False,
+            "error": f"HTTP {e.code}: {detail}{hint}",
+            "model": model,
+        }
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e}", "model": model}
 
