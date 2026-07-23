@@ -69,11 +69,11 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8765
 
 | 路径 | 页面 |
 |------|------|
-| `/` | 文库 |
-| `/read?f=xxx.pdf` | 阅读 |
-| `/capture` | 表格截取（原主页） |
-| `/review` | 表格校对 |
-| `/settings` | 设置 |
+| `/` | 文库（今日待读） |
+| `/read?f=xxx.pdf` | 阅读 + 框选/全文翻译 |
+| `/capture?f=` | 表格截取 |
+| `/review?slug=` | 表格校对 |
+| `/settings` | AI + IMAP 设置 |
 
 > 请勿用 `file://` 直接打开 HTML，必须通过上述服务访问。
 

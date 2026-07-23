@@ -181,6 +181,13 @@
       return;
     }
     const title = it.title || it.filename.replace(/\.pdf$/i, "");
+    const customCols = (state.collections || []).filter((c) => !c.builtin);
+    const colChecks = customCols
+      .map((c) => {
+        const checked = (it.collection_ids || []).includes(c.id) ? "checked" : "";
+        return `<label class="col-check"><input type="checkbox" class="d-col" value="${c.id}" ${checked}/> ${c.name}</label>`;
+      })
+      .join("");
     body.innerHTML = `
       <div class="detail-title"></div>
       <div class="detail-file"></div>
@@ -193,6 +200,10 @@
           <option value="done">已读</option>
           <option value="archived">归档</option>
         </select>
+      </div>
+      <div class="detail-field">
+        <label>自定义集合</label>
+        <div class="col-check-list" id="d-cols">${colChecks || '<span class="hint">暂无（左侧新建）</span>'}</div>
       </div>
       <div class="detail-field">
         <label>标签（逗号分隔）</label>
@@ -215,6 +226,7 @@
     if (it.doi) badges.push(`DOI ${it.doi}`);
     if (it.paper_slug) badges.push(`slug ${it.paper_slug}`);
     if (it.si_status) badges.push(`SI ${it.si_status}`);
+    if (it.translated_pdf) badges.push("有译稿");
     badges.push(`${Math.round((it.size || 0) / 1024)} KB`);
     for (const b of badges) {
       const span = document.createElement("span");
@@ -227,6 +239,12 @@
     $("d-notes").value = it.notes || "";
     $("d-open").addEventListener("click", () => openReader(it.filename));
     $("d-capture").addEventListener("click", () => openCapture(it.filename));
+    const rev = $("d-review");
+    if (it.paper_slug) {
+      rev.href = `/review?slug=${encodeURIComponent(it.paper_slug)}`;
+    } else {
+      rev.href = "/review";
+    }
     $("d-save").addEventListener("click", () => saveDetail());
   }
 
@@ -239,13 +257,16 @@
       .map((s) => s.trim())
       .filter(Boolean);
     const notes = $("d-notes").value;
+    const collection_ids = Array.from(
+      document.querySelectorAll("#d-cols .d-col:checked")
+    ).map((el) => el.value);
     try {
       const updated = await api(
         `/api/library/items/${encodeURIComponent(it.filename)}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status, tags, notes }),
+          body: JSON.stringify({ status, tags, notes, collection_ids }),
         }
       );
       state.selected = updated;

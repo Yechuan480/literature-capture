@@ -462,6 +462,22 @@
   async function init() {
     if (window.ShellNav) ShellNav.mount({ active: "review" });
     bind();
+    const params = new URLSearchParams(window.location.search);
+    const slug = params.get("slug") || params.get("paper_slug");
+    const tableId = params.get("table") || params.get("table_id");
+    if (slug && tableId) {
+      await refreshQueue().catch(() => {});
+      await openItem(slug, tableId);
+      return;
+    }
+    if (slug) {
+      await refreshQueue().catch(() => {});
+      const hit = (state.queue || []).find((x) => x.paper_slug === slug);
+      if (hit) {
+        await openItem(hit.paper_slug, hit.table_id);
+        return;
+      }
+    }
     await loadNext();
   }
 
