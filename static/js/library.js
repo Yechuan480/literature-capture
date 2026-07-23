@@ -9,6 +9,20 @@
     collectionId: "all",
     q: "",
     selected: null,
+    todayItems: [],
+    todayPending: 0,
+    fetchPoll: null,
+  };
+
+  const ST_LABEL = {
+    pending: "待处理",
+    kept: "已保留",
+    dismissed: "已忽略",
+    fetching: "下载中",
+    fetched: "已入库",
+    paywalled: "付费墙",
+    failed: "失败",
+    no_pdf: "无 OA PDF",
   };
 
   const $ = (id) => document.getElementById(id);
@@ -275,6 +289,130 @@
     }
   }
 
+  function setTodayBadge(n) {
+    state.todayPending = n || 0;
+    const b = $("today-badge");
+    if (!b) return;
+    if (n > 0) {
+      b.hidden = false;
+      b.textContent = String(n);
+    } else {
+      b.hidden = true;
+    }
+  }
+
+  function setTodayStatus(text) {
+    const el = $("today-status");
+    if (el) el.textContent = text || "";
+  }
+
+  function renderTodayList() {
+    const root = $("today-list");
+    if (!root) return;
+    const items = state.todayItems || [];
+    if (!items.length) {
+      root.innerHTML = `<div class="empty" style="color:var(--muted);padding:1.2rem;text-align:center">暂无条目。请先在设置中配置 IMAP，再点「刷新邮件」。</div>`;
+      return;
+    }
+    root.innerHTML = "";
+    for (const it of items) {
+      const row = document.createElement("label");
+      row.className = "today-item";
+      const st = it.status || "pending";
+      const canCheck = st === "pending" || st === "kept" || st === "failed" || st === "no_pdf" || st === "paywalled";
+      row.innerHTML = `
+        <input type="checkbox" class="t-check" ${canCheck ? "" : "disabled"} />
+        <div>
+          <div class="t-title"></div>
+          <div class="t-meta"></div>
+          <span class="t-status ${st}"></span>
+        </div>`;
+      row.querySelector(".t-check").value = it.id;
+      row.querySelector(".t-title").textContent = it.title || "（无标题）";
+      const metaBits = [];
+      if (it.authors) metaBits.push(it.authors);
+      if (it.doi) metaBits.push(it.doi);
+      if (it.filename) metaBits.push(it.filename);
+      if (it.error) metaBits.push(it.error);
+      row.querySelector(".t-meta").textContent = metaBits.join(" · ") || it.link || "";
+      row.querySelector(".t-status").textContent = ST_LABEL[st] || st;
+      root.appendChild(row);
+    }
+  }
+
+  async function loadToday(opts) {
+    opts = opts || {};
+    try {
+      let inbox;
+      if (opts.refresh) {
+        inbox = await api("/api/scholar/inbox/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ force: !!opts.force, days: 2 }),
+        });
+      } else {
+        inbox = await api("/api/scholar/inbox/today");
+      }
+      state.todayItems = inbox.items || [];
+      setTodayBadge(inbox.pending_count || 0);
+      renderTodayList();
+      const lead = $("today-lead");
+      if (lead) {
+        lead.textContent = inbox.email_ready
+          ? `共 ${state.todayItems.length} 条 · 待处理 ${inbox.pending_count || 0}` +
+            (inbox.refreshed_at ? ` · 刷新于 ${inbox.refreshed_at}` : "")
+          : "邮箱未就绪：请到「设置」填写 IMAP 与应用专用密码。";
+      }
+      return inbox;
+    } catch (e) {
+      setTodayStatus(e.message);
+      throw e;
+    }
+  }
+
+  function selectedTodayIds() {
+    return Array.from(document.querySelectorAll("#today-list .t-check:checked"))
+      .map((el) => el.value)
+      .filter(Boolean);
+  }
+
+  function openTodayModal() {
+    const m = $("today-modal");
+    if (m) m.hidden = false;
+    loadToday().catch(() => renderTodayList());
+  }
+
+  function closeTodayModal() {
+    const m = $("today-modal");
+    if (m) m.hidden = true;
+    if (state.fetchPoll) {
+      clearTimeout(state.fetchPoll);
+      state.fetchPoll = null;
+    }
+  }
+
+  function pollFetchJob(jobId) {
+    if (state.fetchPoll) clearTimeout(state.fetchPoll);
+    const tick = async () => {
+      try {
+        const j = await api(`/api/scholar/inbox/fetch-jobs/${encodeURIComponent(jobId)}`);
+        setTodayStatus(
+          `下载 ${j.done || 0}/${j.total || 0}` +
+            (j.status === "done" ? " · 完成" : "…")
+        );
+        if (j.status === "done") {
+          await loadToday();
+          await loadItems();
+          return;
+        }
+        state.fetchPoll = setTimeout(tick, 1200);
+      } catch (e) {
+        setTodayStatus(e.message);
+      }
+    };
+    state.fetchPoll = setTimeout(tick, 600);
+  }
+
   function bind() {
     let t = null;
     $("lib-search").addEventListener("input", () => {
@@ -310,6 +448,64 @@
     $("new-col-name").addEventListener("keydown", (e) => {
       if (e.key === "Enter") $("btn-add-col").click();
     });
+
+    $("btn-today").addEventListener("click", () => openTodayModal());
+    $("btn-today-close").addEventListener("click", () => closeTodayModal());
+    $("today-modal").addEventListener("click", (e) => {
+      if (e.target === $("today-modal")) closeTodayModal();
+    });
+    $("btn-today-refresh").addEventListener("click", async () => {
+      setTodayStatus("拉取邮件…");
+      try {
+        await loadToday({ refresh: true, force: true });
+        setTodayStatus("已刷新");
+      } catch (e) {
+        setTodayStatus(e.message);
+      }
+    });
+    $("btn-today-all").addEventListener("click", () => {
+      document.querySelectorAll("#today-list .t-check:not(:disabled)").forEach((el) => {
+        el.checked = true;
+      });
+    });
+    $("btn-today-dismiss").addEventListener("click", async () => {
+      const ids = selectedTodayIds();
+      if (!ids.length) {
+        setTodayStatus("请先勾选条目");
+        return;
+      }
+      try {
+        await api("/api/scholar/inbox/decide", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids, action: "dismiss" }),
+        });
+        await loadToday();
+        setTodayStatus(`已忽略 ${ids.length} 条`);
+      } catch (e) {
+        setTodayStatus(e.message);
+      }
+    });
+    $("btn-today-keep").addEventListener("click", async () => {
+      const ids = selectedTodayIds();
+      if (!ids.length) {
+        setTodayStatus("请先勾选条目");
+        return;
+      }
+      try {
+        setTodayStatus("提交下载…");
+        const job = await api("/api/scholar/inbox/fetch-pdfs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids }),
+        });
+        await loadToday();
+        if (job.job_id) pollFetchJob(job.job_id);
+        else setTodayStatus(`已排队 ${job.queued || 0}`);
+      } catch (e) {
+        setTodayStatus(e.message);
+      }
+    });
   }
 
   async function init() {
@@ -324,6 +520,18 @@
       /* continue */
     }
     await loadItems();
+    // soft load today badge + auto-refresh once if empty and email ready
+    try {
+      let inbox = await loadToday();
+      if (
+        inbox.email_ready &&
+        (!inbox.refreshed_at || !(inbox.items || []).length)
+      ) {
+        await loadToday({ refresh: true });
+      }
+    } catch (_) {
+      /* optional */
+    }
   }
 
   document.addEventListener("DOMContentLoaded", () => {

@@ -1,5 +1,150 @@
 /* Zotero-like library layout */
 
+.library-toolbar #btn-today {
+  position: relative;
+  white-space: nowrap;
+}
+
+.library-toolbar .badge-n {
+  display: inline-block;
+  min-width: 1.1rem;
+  padding: 0 0.3rem;
+  margin-left: 0.15rem;
+  font-size: 0.68rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #082f49;
+  font-weight: 600;
+  text-align: center;
+}
+
+.library-toolbar .badge-n[hidden] {
+  display: none !important;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal-backdrop[hidden] {
+  display: none !important;
+}
+
+.modal-card {
+  width: min(42rem, 100%);
+  max-height: min(80vh, 36rem);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.modal-lead {
+  margin: 0;
+  padding: 0.5rem 0.9rem 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.55rem 0.9rem;
+}
+
+.modal-actions button {
+  font-size: 0.78rem;
+  padding: 0.3rem 0.55rem;
+}
+
+.today-list {
+  flex: 1;
+  min-height: 8rem;
+  overflow: auto;
+  padding: 0 0.65rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.today-item {
+  display: grid;
+  grid-template-columns: 1.4rem 1fr;
+  gap: 0.45rem;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 0.78rem;
+}
+
+.today-item .t-title {
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.today-item .t-meta {
+  color: var(--muted);
+  font-size: 0.7rem;
+  margin-top: 0.2rem;
+  line-height: 1.35;
+}
+
+.today-item .t-status {
+  display: inline-block;
+  margin-top: 0.25rem;
+  font-size: 0.68rem;
+  padding: 0.08rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.today-item .t-status.fetched {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.today-item .t-status.paywalled,
+.today-item .t-status.failed,
+.today-item .t-status.no_pdf {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.modal-status {
+  padding: 0.4rem 0.9rem 0.65rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+
 .library-page {
   height: 100vh;
   max-height: 100vh;

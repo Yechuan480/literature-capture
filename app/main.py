@@ -19,6 +19,7 @@ from app.routers import (
     papers,
     review,
     settings as settings_router,
+    scholar,
     si,
     translate,
 )
@@ -28,7 +29,7 @@ from app.services.extract_table import ocr_status
 settings = get_settings()
 settings.ensure_dirs()
 
-app = FastAPI(title="Literature Reader", version="1.5.0")
+app = FastAPI(title="Literature Reader", version="1.6.0")
 app.include_router(papers.router)
 app.include_router(capture.router)
 app.include_router(settings_router.router)
@@ -38,6 +39,7 @@ app.include_router(si.router)
 app.include_router(library.router)
 app.include_router(chat.router)
 app.include_router(translate.router)
+app.include_router(scholar.router)
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -92,7 +94,7 @@ def public_config():
             "reader": True,
             "chat": True,
             "translate": True,
-            "scholar": False,
+            "scholar": True,
         },
     }
 

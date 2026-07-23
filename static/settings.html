@@ -75,16 +75,21 @@
         gap: 0.4rem;
         margin-top: 0.35rem;
       }
-      #ai-settings-msg {
+      .settings-msg {
         font-size: 0.75rem;
         color: var(--muted);
         min-height: 1.2em;
       }
-      #ai-settings-msg.ok {
+      .settings-msg.ok {
         color: var(--ok);
       }
-      #ai-settings-msg.warn {
+      .settings-msg.warn {
         color: var(--warn);
+      }
+      .field-row {
+        display: grid;
+        grid-template-columns: 1fr 6rem;
+        gap: 0.5rem;
       }
     </style>
   </head>
@@ -92,12 +97,12 @@
     <div class="settings-page">
       <h1>设置</h1>
       <p class="lead">
-        AI 视觉 / 聊天共用同一套 OpenAI 兼容接口。邮箱推送与翻译将在后续版本接入。
+        AI 与邮箱凭据仅保存在本机 <code>data/</code>，不会提交到 Git。
       </p>
 
       <section class="settings-card">
-        <h2>AI（视觉提取 · 聊天）</h2>
-        <p>Key 仅保存在本机 <code>data/ai_settings.json</code>，不会提交到 Git。</p>
+        <h2>AI（视觉提取 · 聊天 · 翻译）</h2>
+        <p>OpenAI 兼容接口；Key 存 <code>data/ai_settings.json</code>。</p>
         <div class="settings-form">
           <label class="field-check">
             <input type="checkbox" id="ai-enabled" /> 启用 AI
@@ -124,18 +129,70 @@
             <button type="button" class="primary" id="btn-ai-save">保存</button>
             <button type="button" id="btn-ai-test">测试连接</button>
           </div>
-          <div id="ai-settings-msg"></div>
+          <div id="ai-settings-msg" class="settings-msg"></div>
         </div>
       </section>
 
       <section class="settings-card">
         <h2>邮箱 · Google 学术推送</h2>
-        <p>即将支持：IMAP + 授权码、今日待读清单、OA 自动拉取 PDF。请关注后续版本。</p>
+        <p>
+          通过 IMAP 读取 Scholar Alert（默认 Gmail
+          <code>imap.gmail.com:993</code> +
+          <strong>应用专用密码</strong>）。仅用于生成「今日待读」；下载 PDF 只走开放获取链接，不绕过付费墙。
+        </p>
+        <div class="settings-form">
+          <label class="field-check">
+            <input type="checkbox" id="em-enabled" /> 启用邮箱拉取
+          </label>
+          <div class="field-row">
+            <label class="field">
+              <span>IMAP 主机</span>
+              <input type="text" id="em-host" placeholder="imap.gmail.com" spellcheck="false" />
+            </label>
+            <label class="field">
+              <span>端口</span>
+              <input type="number" id="em-port" value="993" />
+            </label>
+          </div>
+          <label class="field">
+            <span>账号（邮箱）</span>
+            <input type="email" id="em-user" placeholder="you@gmail.com" autocomplete="username" spellcheck="false" />
+          </label>
+          <label class="field">
+            <span>应用专用密码</span>
+            <input type="password" id="em-password" placeholder="16 位应用密码（留空保持不变）" autocomplete="new-password" spellcheck="false" />
+          </label>
+          <label class="field-check">
+            <input type="checkbox" id="em-show-pw" /> 显示密码
+          </label>
+          <label class="field-check">
+            <input type="checkbox" id="em-clear-pw" /> 清除已保存密码
+          </label>
+          <label class="field">
+            <span>文件夹</span>
+            <input type="text" id="em-folder" placeholder="INBOX" spellcheck="false" />
+          </label>
+          <label class="field">
+            <span>发件人过滤</span>
+            <input type="text" id="em-sender" placeholder="scholaralerts@google.com" spellcheck="false" />
+          </label>
+          <label class="field-check">
+            <input type="checkbox" id="em-ssl" checked /> SSL
+          </label>
+          <div class="settings-actions">
+            <button type="button" class="primary" id="btn-em-save">保存</button>
+            <button type="button" id="btn-em-test">测试 IMAP</button>
+          </div>
+          <div id="em-settings-msg" class="settings-msg"></div>
+        </div>
       </section>
 
       <section class="settings-card">
         <h2>翻译</h2>
-        <p>目标语言固定为 <strong>zh-CN</strong>。框选翻译与全文译稿将在阅读页接入。</p>
+        <p>
+          目标语言固定为 <strong>zh-CN</strong>。在阅读页使用「框选翻译」或「全文翻译」；译稿保存为
+          <code>*.zh-CN.pdf</code>。
+        </p>
       </section>
 
       <section class="settings-card">
@@ -149,10 +206,9 @@
       (function () {
         if (window.ShellNav) ShellNav.mount({ active: "settings" });
         const $ = (id) => document.getElementById(id);
-        function msg(text, kind) {
-          const el = $("ai-settings-msg");
+        function msg(el, text, kind) {
           el.textContent = text || "";
-          el.className = kind || "";
+          el.className = "settings-msg" + (kind ? " " + kind : "");
         }
         async function api(path, options) {
           const res = await fetch(path, options);
@@ -177,16 +233,31 @@
           $("ai-enabled").checked = !!ai.enabled;
           $("ai-base-url").value = ai.base_url || "";
           $("ai-model").value = ai.model || "";
-          $("ai-api-key").placeholder = ai.has_key
+          $("ai-api-key").placeholder = ai.has_key || ai.api_key_set
             ? "已保存 Key（留空保持不变）"
             : "sk-…";
+          const em = await api("/api/scholar/settings");
+          $("em-enabled").checked = !!em.enabled;
+          $("em-host").value = em.host || "imap.gmail.com";
+          $("em-port").value = em.port || 993;
+          $("em-user").value = em.user || "";
+          $("em-folder").value = em.folder || "INBOX";
+          $("em-sender").value = em.sender_filter || "scholaralerts@google.com";
+          $("em-ssl").checked = em.ssl !== false;
+          $("em-password").placeholder = em.password_set
+            ? "已保存密码（留空保持不变）"
+            : "应用专用密码";
         }
         $("ai-show-key").addEventListener("change", () => {
           $("ai-api-key").type = $("ai-show-key").checked ? "text" : "password";
         });
+        $("em-show-pw").addEventListener("change", () => {
+          $("em-password").type = $("em-show-pw").checked ? "text" : "password";
+        });
         $("btn-ai-save").addEventListener("click", async () => {
+          const el = $("ai-settings-msg");
           try {
-            msg("保存中…");
+            msg(el, "保存中…");
             const body = {
               enabled: $("ai-enabled").checked,
               base_url: $("ai-base-url").value.trim(),
@@ -202,24 +273,65 @@
             });
             $("ai-api-key").value = "";
             $("ai-clear-key").checked = false;
-            msg("已保存", "ok");
+            msg(el, "已保存", "ok");
             await load();
           } catch (e) {
-            msg(e.message, "warn");
+            msg(el, e.message, "warn");
           }
         });
         $("btn-ai-test").addEventListener("click", async () => {
+          const el = $("ai-settings-msg");
           try {
-            msg("测试中…");
+            msg(el, "测试中…");
             const r = await api("/api/settings/ai/test", { method: "POST" });
             const t = r.test || r;
             const ok = !!(t.ok ?? r.ready);
-            msg(t.message || (ok ? "连接成功" : "失败"), ok ? "ok" : "warn");
+            msg(el, t.message || (ok ? "连接成功" : "失败"), ok ? "ok" : "warn");
           } catch (e) {
-            msg(e.message, "warn");
+            msg(el, e.message, "warn");
           }
         });
-        load().catch((e) => msg(e.message, "warn"));
+        $("btn-em-save").addEventListener("click", async () => {
+          const el = $("em-settings-msg");
+          try {
+            msg(el, "保存中…");
+            const body = {
+              enabled: $("em-enabled").checked,
+              host: $("em-host").value.trim(),
+              port: parseInt($("em-port").value, 10) || 993,
+              user: $("em-user").value.trim(),
+              folder: $("em-folder").value.trim() || "INBOX",
+              sender_filter: $("em-sender").value.trim(),
+              ssl: $("em-ssl").checked,
+              clear_password: $("em-clear-pw").checked,
+            };
+            const pw = $("em-password").value.trim();
+            if (pw) body.password = pw;
+            await api("/api/scholar/settings", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+            $("em-password").value = "";
+            $("em-clear-pw").checked = false;
+            msg(el, "已保存", "ok");
+            await load();
+          } catch (e) {
+            msg(el, e.message, "warn");
+          }
+        });
+        $("btn-em-test").addEventListener("click", async () => {
+          const el = $("em-settings-msg");
+          try {
+            msg(el, "测试 IMAP…");
+            const r = await api("/api/scholar/settings/test", { method: "POST" });
+            const t = r.test || r;
+            msg(el, t.message || (t.ok ? "成功" : "失败"), t.ok ? "ok" : "warn");
+          } catch (e) {
+            msg(el, e.message, "warn");
+          }
+        });
+        load().catch((e) => msg($("ai-settings-msg"), e.message, "warn"));
       })();
     </script>
   </body>

@@ -30,6 +30,9 @@
             autocomplete="off"
             spellcheck="false"
           />
+          <button type="button" id="btn-today" title="Google 学术今日待读">
+            今日待读 <span class="badge-n" id="today-badge" hidden>0</span>
+          </button>
           <button type="button" id="btn-sync" title="重新扫描 pdfs/">同步</button>
           <span class="hint" id="lib-count">—</span>
         </div>
@@ -63,6 +66,28 @@
           <div class="empty">选择一篇文献</div>
         </div>
       </aside>
+    </div>
+
+    <div class="modal-backdrop" id="today-modal" hidden>
+      <div class="modal-card" role="dialog" aria-labelledby="today-title">
+        <div class="modal-head">
+          <h2 id="today-title">今日待读</h2>
+          <button type="button" class="ghost" id="btn-today-close">关闭</button>
+        </div>
+        <p class="modal-lead" id="today-lead">
+          来自 Google 学术邮件推送。勾选后可保留并尝试 OA 下载 PDF（不绕过付费墙）。
+        </p>
+        <div class="modal-actions">
+          <button type="button" id="btn-today-refresh">刷新邮件</button>
+          <button type="button" id="btn-today-all">全选待处理</button>
+          <button type="button" class="primary" id="btn-today-keep">保留并下载</button>
+          <button type="button" id="btn-today-dismiss">忽略所选</button>
+        </div>
+        <div class="today-list" id="today-list">
+          <div class="empty">加载中…</div>
+        </div>
+        <div class="modal-status" id="today-status"></div>
+      </div>
     </div>
 
     <script src="/static/js/shell.js"></script>
