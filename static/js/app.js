@@ -84,16 +84,32 @@
 
   function updateTitleUi() {
     $("title-input").value = state.title || "";
-    $("title-source").textContent = state.titleSource
-      ? `来源: ${state.titleSource}`
-      : "";
-    $("slug-preview").textContent = state.paperSlug
-      ? `文件夹: ${state.paperSlug}`
-      : `预览 slug: ${slugifyPreview(state.title)}`;
+    const srcEl = $("title-source");
+    if (srcEl) {
+      srcEl.textContent = state.titleSource ? state.titleSource : "";
+    }
+    const slugEl = $("slug-preview");
+    if (slugEl) {
+      slugEl.textContent = state.paperSlug
+        ? state.paperSlug
+        : slugifyPreview(state.title);
+      slugEl.title = state.paperSlug
+        ? `文件夹: ${state.paperSlug}`
+        : `预览 slug: ${slugifyPreview(state.title)}`;
+    }
+    const meta = $("title-meta");
+    if (meta) {
+      meta.title = [
+        state.titleSource ? `来源: ${state.titleSource}` : "",
+        state.paperSlug ? `文件夹: ${state.paperSlug}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    }
     const btn = $("btn-no-tables");
     if (btn) {
       btn.classList.toggle("no-tables-active", !!state.noTables);
-      btn.textContent = state.noTables ? "取消「无表格」" : "无表格";
+      btn.textContent = state.noTables ? "取消无表" : "无表格";
       btn.disabled = !state.filename;
     }
     const del = $("btn-delete-paper");
@@ -761,7 +777,11 @@
       badge.title = (si && si.message) || label;
     }
     const text = (si && si.message) || "";
-    if (msg) msg.textContent = text;
+    if (msg) {
+      msg.textContent = text;
+      msg.hidden = !text;
+      msg.title = text;
+    }
     if (panel) {
       const n = ((si && si.files) || (payload && payload.files) || []).length;
       panel.textContent =

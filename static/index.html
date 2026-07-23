@@ -42,34 +42,35 @@
       </aside>
 
       <main class="main">
-        <div class="title-bar">
-          <label for="title-input">文献标题（可编辑，用于命名与文件夹）</label>
+        <div class="title-bar title-bar-compact">
           <div class="title-row">
-            <input type="text" id="title-input" placeholder="打开 PDF 后自动识别标题…" />
-            <button type="button" class="primary" id="btn-confirm-title">确认标题</button>
+            <input
+              type="text"
+              id="title-input"
+              placeholder="文献标题…"
+              title="可编辑，用于命名与文件夹"
+            />
+            <button type="button" class="primary" id="btn-confirm-title" title="确认标题并建会话">确认</button>
             <button type="button" id="btn-no-tables" title="本篇无表格可截取，在列表中标注">无表格</button>
-            <button type="button" class="danger" id="btn-delete-paper" title="删除该 PDF 及对应截取结果（不可恢复）" disabled>删除文献</button>
+            <button type="button" class="danger" id="btn-delete-paper" title="删除该 PDF 及对应截取结果（不可恢复）" disabled>删除</button>
+            <span class="title-sep" aria-hidden="true"></span>
+            <input
+              type="text"
+              id="doi-input"
+              class="doi-inline"
+              placeholder="DOI / URL"
+              title="DOI 或文章页 URL；失败可手填后获取 SI"
+              spellcheck="false"
+              autocomplete="off"
+            />
+            <span class="badge si-badge" id="si-badge" title="补充材料状态">SI: —</span>
+            <button type="button" id="btn-si-run" title="获取或重试补充材料" disabled>SI</button>
+            <span class="slug-preview" id="title-meta" title="">
+              <span id="title-source"></span>
+              <span id="slug-preview">slug: —</span>
+            </span>
           </div>
-          <div class="slug-preview">
-            <span id="title-source"></span>
-            ·
-            <span id="slug-preview">预览 slug: —</span>
-          </div>
-          <div class="si-bar">
-            <label for="doi-input" class="si-label">DOI / 文章页 URL</label>
-            <div class="si-row">
-              <input
-                type="text"
-                id="doi-input"
-                placeholder="打开后自动解析 DOI；失败可手填 DOI 或 https://…"
-                spellcheck="false"
-                autocomplete="off"
-              />
-              <span class="badge si-badge" id="si-badge" title="补充材料状态">SI: —</span>
-              <button type="button" id="btn-si-run" title="获取或重试补充材料" disabled>获取 SI</button>
-            </div>
-            <div class="si-msg hint" id="si-msg"></div>
-          </div>
+          <div class="si-msg hint" id="si-msg" hidden></div>
         </div>
 
         <div class="toolbar viewer-toolbar">

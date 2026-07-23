@@ -492,11 +492,16 @@ button.no-tables-active {
 }
 
 .title-bar {
-  padding: 0.45rem 0.75rem;
+  padding: 0.28rem 0.55rem;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   display: grid;
-  gap: 0.28rem;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.title-bar-compact {
+  min-height: 0;
 }
 
 .title-bar label {
@@ -506,32 +511,63 @@ button.no-tables-active {
 
 .title-row {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.3rem;
   align-items: center;
+  min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .title-row input[type="text"] {
-  flex: 1;
+  flex: 1 1 10rem;
+  min-width: 6rem;
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 6px;
-  padding: 0.32rem 0.5rem;
-  font-size: 0.8rem;
+  padding: 0.28rem 0.45rem;
+  font-size: 0.78rem;
+}
+
+.title-row input.doi-inline {
+  flex: 0 1 11rem;
+  min-width: 6.5rem;
+  max-width: 16rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  padding: 0.26rem 0.4rem;
 }
 
 .title-row button {
-  padding: 0.28rem 0.55rem;
-  font-size: 0.72rem;
+  padding: 0.24rem 0.48rem;
+  font-size: 0.7rem;
   border-radius: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.title-sep {
+  width: 1px;
+  height: 1.1rem;
+  background: var(--border);
+  flex-shrink: 0;
+  margin: 0 0.1rem;
 }
 
 .slug-preview {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   color: var(--muted);
   font-family: var(--mono);
-  word-break: break-all;
-  line-height: 1.3;
+  line-height: 1.2;
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slug-preview #title-source:not(:empty)::after {
+  content: " · ";
 }
 
 .si-bar {
@@ -570,13 +606,22 @@ button.no-tables-active {
 .si-badge {
   flex-shrink: 0;
   white-space: nowrap;
-  font-size: 0.68rem;
-  padding: 0.12rem 0.4rem;
+  font-size: 0.65rem;
+  padding: 0.1rem 0.35rem;
 }
 
 .si-msg {
-  font-size: 0.65rem !important;
-  line-height: 1.3;
+  font-size: 0.62rem !important;
+  line-height: 1.25;
+  padding: 0.12rem 0 0.05rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.si-msg[hidden] {
+  display: none !important;
 }
 
 .si-badge.si-ok {
@@ -602,7 +647,6 @@ button.no-tables-active {
 }
 
 .si-msg {
-  min-height: 1em;
   word-break: break-word;
 }
 

@@ -12,7 +12,7 @@
       <div class="rh-left">
         <a class="brand" href="/">← 截取工具</a>
         <h1>表格校对</h1>
-        <p class="hint">对比截图与提取结果 · Y/1 通过 · N/2 不通过 · Tab 下一项 · Shift+Tab 上一项 · S 跳过 · R 重提</p>
+        <p class="hint">Y/1 通过 · N/2 不通过 · Tab 下一项 · Shift+Tab 上一项 · S 跳过 · R 重提</p>
       </div>
       <div class="rh-stats" id="stats-bar">
         <span class="stat"><b id="st-remaining">—</b> 待校对</span>
@@ -47,7 +47,7 @@
 
         <div class="review-work" id="review-work" hidden>
           <div class="work-meta">
-            <div>
+            <div class="work-meta-text">
               <div class="work-title" id="work-title">—</div>
               <div class="work-sub" id="work-sub">—</div>
             </div>
@@ -61,8 +61,8 @@
           <div class="compare-grid">
             <section class="pane pane-png">
               <div class="pane-head">
-                <h3>原图截图 (PNG)</h3>
-                <a id="png-open" href="#" target="_blank" rel="noopener">新窗口打开</a>
+                <h3>原图截图</h3>
+                <a id="png-open" href="#" target="_blank" rel="noopener">新窗口</a>
               </div>
               <div class="png-wrap">
                 <img id="png-img" alt="table capture" />
@@ -87,12 +87,19 @@
             <div class="verdict-block">
               <button type="button" class="btn-pass" id="btn-pass">✓ 通过</button>
               <button type="button" class="btn-fail" id="btn-fail">✗ 不通过</button>
-              <button type="button" class="ghost" id="btn-skip">跳过</button>
+              <button type="button" class="ghost btn-skip" id="btn-skip">跳过</button>
+              <input
+                type="text"
+                id="review-note"
+                class="note-inline"
+                placeholder="备注（可选）"
+                autocomplete="off"
+              />
             </div>
-            <div class="retry-block" id="retry-block">
-              <label class="hint">不通过后的重提策略</label>
-              <div class="strategy-row">
-                <select id="strategy-select">
+            <details class="retry-compact" id="retry-block">
+              <summary title="一般筛「未通过」后批量处理即可">重提</summary>
+              <div class="retry-body">
+                <select id="strategy-select" title="重提策略">
                   <option value="ai" selected>仅 AI 视觉</option>
                   <option value="auto">自动（img2table → RapidOCR）</option>
                   <option value="tesseract">img2table + Tesseract</option>
@@ -100,18 +107,11 @@
                   <option value="tesseract_ai">img2table + AI 增强</option>
                   <option value="rapidocr_ai">RapidOCR + AI 增强</option>
                 </select>
-                <button type="button" class="primary" id="btn-reextract">重新提取</button>
+                <button type="button" class="primary sm" id="btn-reextract">重提此项</button>
+                <span class="hint" id="retry-hint">筛「未通过」后逐项处理；重提后回待校对</span>
               </div>
-              <p class="hint" id="retry-hint">
-                重新提取后状态回到「待校对」，会再次进入队列供你核对。
-              </p>
-            </div>
+            </details>
           </div>
-
-          <label class="note-field">
-            <span>备注（可选）</span>
-            <input type="text" id="review-note" placeholder="例如：表头错位 / 数字 OCR 噪声…" />
-          </label>
         </div>
       </main>
     </div>

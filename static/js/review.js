@@ -240,14 +240,18 @@
       if (sel.value.includes("ai") || sel.value === "ai") {
         sel.value = "tesseract";
       }
-      $("retry-hint").textContent =
-        "AI 未配置：可在主页 AI 设置中填写 Key。当前可用本地策略重提。";
+      if ($("retry-hint")) {
+        $("retry-hint").textContent =
+          "AI 未配置：主页填 Key 后可用；当前本地策略";
+      }
     } else {
       [...$("strategy-select").options].forEach((o) => {
         o.disabled = false;
       });
-      $("retry-hint").textContent =
-        "重新提取后状态回到「待校对」，会再次进入队列供你核对。";
+      if ($("retry-hint")) {
+        $("retry-hint").textContent =
+          "筛「未通过」后逐项处理；重提后回待校对";
+      }
     }
 
     renderQueue();
