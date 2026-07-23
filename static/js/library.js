@@ -356,6 +356,7 @@
         </div>
         <div class="t-body">
           <div class="t-title"></div>
+          <div class="t-title-zh" hidden></div>
           <div class="t-meta"></div>
           <span class="t-status ${st}"></span>
         </div>`;
@@ -371,7 +372,9 @@
         cb.dispatchEvent(new Event("change", { bubbles: true }));
       });
       const titleEl = row.querySelector(".t-title");
+      const titleZhEl = row.querySelector(".t-title-zh");
       const title = it.title || "（无标题）";
+      const titleZh = (it.title_zh || "").trim();
       const link = (it.link || "").trim();
       if (link) {
         titleEl.innerHTML = "";
@@ -386,6 +389,27 @@
         titleEl.appendChild(a);
       } else {
         titleEl.textContent = title;
+      }
+      // Bilingual: show zh under original when different
+      if (titleZh && titleZh !== title) {
+        titleZhEl.hidden = false;
+        if (link) {
+          titleZhEl.innerHTML = "";
+          const az = document.createElement("a");
+          az.className = "t-link-zh";
+          az.href = link;
+          az.target = "_blank";
+          az.rel = "noopener noreferrer";
+          az.textContent = titleZh;
+          az.title = titleZh;
+          az.addEventListener("click", (e) => e.stopPropagation());
+          titleZhEl.appendChild(az);
+        } else {
+          titleZhEl.textContent = titleZh;
+        }
+      } else {
+        titleZhEl.hidden = true;
+        titleZhEl.textContent = "";
       }
       const metaEl = row.querySelector(".t-meta");
       metaEl.innerHTML = "";

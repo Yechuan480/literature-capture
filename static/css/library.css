@@ -156,6 +156,27 @@
   text-decoration: underline;
 }
 
+.today-item .t-title-zh {
+  margin-top: 0.12rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--accent);
+  line-height: 1.35;
+}
+
+.today-item .t-title-zh a.t-link-zh {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.today-item .t-title-zh a.t-link-zh:hover {
+  text-decoration: underline;
+}
+
+.today-item .t-title-zh[hidden] {
+  display: none;
+}
+
 .today-item .t-meta {
   color: var(--muted);
   font-size: 0.7rem;

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 from datetime import date, datetime, timezone
 from typing import Any
@@ -22,6 +23,8 @@ INBOX_PATH = DATA_DIR / "scholar_inbox.json"
 STATUSES = frozenset(
     {"pending", "kept", "dismissed", "fetching", "fetched", "paywalled", "failed", "no_pdf"}
 )
+
+_CJK_RE = re.compile(r"[一-鿿㐀-䶿豈-﫿]")
 
 
 def _today() -> str:
@@ -59,12 +62,109 @@ def get_day(day: str | None = None) -> dict[str, Any]:
     with _LOCK:
         store = _load()
         bucket = store["days"].get(day) or {"date": day, "items": [], "refreshed_at": None}
-        return {
-            "date": day,
-            "items": list(bucket.get("items") or []),
-            "refreshed_at": bucket.get("refreshed_at"),
-            "email_ready": email_ready(),
-        }
+        items = [dict(it) for it in (bucket.get("items") or [])]
+        refreshed_at = bucket.get("refreshed_at")
+    # Lazy backfill title_zh for items saved before bilingual titles
+    need = [
+        it
+        for it in items
+        if (it.get("title") or "").strip() and not (it.get("title_zh") or "").strip()
+    ]
+    if need:
+        n = fill_title_zh(items, limit=40)
+        if n:
+            with _LOCK:
+                store = _load()
+                bucket = store["days"].get(day) or {
+                    "date": day,
+                    "items": [],
+                    "refreshed_at": refreshed_at,
+                }
+                by_id = {it["id"]: it for it in items if it.get("id")}
+                out_items = []
+                for it in list(bucket.get("items") or items):
+                    iid = it.get("id")
+                    row = dict(it)
+                    if iid and iid in by_id and by_id[iid].get("title_zh"):
+                        row["title_zh"] = by_id[iid]["title_zh"]
+                    out_items.append(row)
+                bucket["items"] = out_items
+                store["days"][day] = bucket
+                _save(store)
+                items = [dict(it) for it in out_items]
+                refreshed_at = bucket.get("refreshed_at")
+    return {
+        "date": day,
+        "items": items,
+        "refreshed_at": refreshed_at,
+        "email_ready": email_ready(),
+    }
+
+
+def _mostly_cjk(text: str) -> bool:
+    """True if title is already Chinese-heavy (skip re-translate)."""
+    s = (text or "").strip()
+    if not s:
+        return False
+    letters = [c for c in s if c.isalpha() or _CJK_RE.match(c)]
+    if not letters:
+        return False
+    cjk = sum(1 for c in letters if _CJK_RE.match(c))
+    return (cjk / len(letters)) >= 0.35
+
+
+def _translate_title_zh(title: str) -> str | None:
+    """Translate paper title → zh-CN. Prefer Google (no key); fall back to AI."""
+    title = (title or "").strip()
+    if not title or _mostly_cjk(title):
+        return None
+    try:
+        from app.services.translate.providers import translate_with_provider
+    except Exception:
+        return None
+    for provider in ("google", "ai"):
+        try:
+            r = translate_with_provider(
+                title,
+                provider=provider,
+                context="学术论文标题，简洁准确直译为中文，不要解释",
+            )
+            if not r.get("ok"):
+                continue
+            zh = (r.get("translation") or "").strip()
+            # strip accidental quotes / trailing period noise
+            zh = zh.strip(" \t\r\n\"'“”‘’")
+            if zh and zh != title:
+                return zh[:400]
+        except Exception:
+            continue
+    return None
+
+
+def fill_title_zh(items: list[dict[str, Any]], *, limit: int = 80) -> int:
+    """
+    Fill missing title_zh on items (mutates in place).
+    Returns number of titles translated.
+    """
+    filled = 0
+    for it in items:
+        if filled >= limit:
+            break
+        title = (it.get("title") or "").strip()
+        if not title:
+            continue
+        if (it.get("title_zh") or "").strip():
+            continue
+        if _mostly_cjk(title):
+            # Already Chinese: mirror so UI can still show a 中 line if desired
+            it["title_zh"] = title
+            filled += 1
+            continue
+        zh = _translate_title_zh(title)
+        if zh:
+            it["title_zh"] = zh
+            filled += 1
+    return filled
 
 
 def _merge_items(existing: list[dict[str, Any]], new_items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -76,7 +176,7 @@ def _merge_items(existing: list[dict[str, Any]], new_items: list[dict[str, Any]]
         if iid in by_id:
             # keep decision/fetch state; refresh title/links if empty
             cur = by_id[iid]
-            for k in ("title", "authors", "abstract", "link", "pdf_link", "doi"):
+            for k in ("title", "title_zh", "authors", "abstract", "link", "pdf_link", "doi"):
                 if not cur.get(k) and it.get(k):
                     cur[k] = it[k]
         else:
@@ -84,6 +184,7 @@ def _merge_items(existing: list[dict[str, Any]], new_items: list[dict[str, Any]]
             row.setdefault("status", "pending")
             row.setdefault("filename", None)
             row.setdefault("error", None)
+            row.setdefault("title_zh", None)
             row["added_at"] = utc_now_iso()
             by_id[iid] = row
     # pending first, then others by added_at
@@ -129,12 +230,46 @@ def refresh_inbox(*, days: int = 1, force: bool = False) -> dict[str, Any]:
             # still allow merge if new mails — always merge when called
             pass
         merged = _merge_items(list(bucket.get("items") or []), parsed)
+
+    # Translate titles outside lock (network I/O)
+    titles_zh = fill_title_zh(merged)
+
+    with _LOCK:
+        store = _load()
+        # re-merge with any concurrent status changes during translate
+        existing = list((store["days"].get(day) or {}).get("items") or [])
+        # Prefer our merged list (has new papers + title_zh), but keep newer status
+        by_id = {it["id"]: dict(it) for it in merged if it.get("id")}
+        for it in existing:
+            iid = it.get("id")
+            if not iid or iid not in by_id:
+                continue
+            cur = by_id[iid]
+            for k in ("status", "filename", "error", "decided_at"):
+                if it.get(k) is not None and (k != "status" or it.get(k) != "pending"):
+                    # keep non-pending decisions from concurrent UI
+                    if k == "status" and cur.get("status") == "pending" and it.get("status") != "pending":
+                        cur[k] = it[k]
+                    elif k != "status":
+                        if it.get(k):
+                            cur[k] = it[k]
+            if it.get("title_zh") and not cur.get("title_zh"):
+                cur["title_zh"] = it["title_zh"]
+        merged = list(by_id.values())
+
+        def sort_key(x: dict[str, Any]) -> tuple:
+            st = x.get("status") or "pending"
+            pri = 0 if st == "pending" else 1
+            return (pri, x.get("added_at") or "")
+
+        merged.sort(key=sort_key)
         bucket = {
             "date": day,
             "items": merged,
             "refreshed_at": utc_now_iso(),
             "source_messages": len(messages),
             "parsed_new": len(parsed),
+            "titles_zh": titles_zh,
         }
         store["days"][day] = bucket
         # prune days older than 14
@@ -159,6 +294,7 @@ def refresh_inbox(*, days: int = 1, force: bool = False) -> dict[str, Any]:
             "refreshed_at": bucket["refreshed_at"],
             "source_messages": len(messages),
             "parsed": len(parsed),
+            "titles_zh": titles_zh,
             "email_ready": True,
         }
 
