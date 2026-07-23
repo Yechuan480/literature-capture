@@ -13,6 +13,7 @@ from app.config import get_settings
 from app.models.schemas import HealthResponse
 from app.routers import (
     capture,
+    chat,
     detect,
     library,
     papers,
@@ -34,6 +35,7 @@ app.include_router(review.router)
 app.include_router(detect.router)
 app.include_router(si.router)
 app.include_router(library.router)
+app.include_router(chat.router)
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -86,7 +88,7 @@ def public_config():
         "features": {
             "library": True,
             "reader": True,
-            "chat": False,
+            "chat": True,
             "translate": False,
             "scholar": False,
         },

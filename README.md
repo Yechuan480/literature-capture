@@ -20,6 +20,7 @@
 | **表格截取** | `/capture` 框选 PNG → 批量提取 CSV/Excel；SI 开放附件 |
 | **表格校对** | `/review` PNG 与表对比，通过/不通过，多策略重提 |
 | **设置** | `/settings` AI Key（本机 `data/ai_settings.json`）；邮箱/翻译占位 |
+| **悬浮 AI 助手** | 右下角悬浮球；全站可用，结合当前 PDF 上下文；历史存 `data/chat/` |
 | 标题识别 | PDF 元数据 → 首页正文 → 文件名 |
 | **补充材料 SI** | DOI → Crossref / 出版商启发式 → `_captures/{slug}/si/`（不绕过付费墙） |
 | 主导航 | 文库 · 阅读 · 截取 · 校对 · 设置 |

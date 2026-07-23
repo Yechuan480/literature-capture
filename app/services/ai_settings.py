@@ -70,9 +70,9 @@ def save_ai_settings(
         current["enabled"] = bool(enabled)
     if base_url is not None:
         # Host-only URLs miss /v1 and hit the provider SPA (HTML 200 → JSON decode error).
-        from app.services.ai_vision import _normalize_base_url
+        from app.services.ai_client import normalize_base_url
 
-        current["base_url"] = _normalize_base_url(
+        current["base_url"] = normalize_base_url(
             (base_url or "").strip() or "https://api.openai.com/v1"
         )
     if model is not None:

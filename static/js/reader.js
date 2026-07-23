@@ -66,6 +66,7 @@
 
   async function openFile(filename) {
     state.filename = filename;
+    if (window.ChatFloat) ChatFloat.setPaperContext(filename);
     $("reader-empty").hidden = true;
     $("reader-toolbar").hidden = false;
     $("reader-stage-wrap").hidden = false;
