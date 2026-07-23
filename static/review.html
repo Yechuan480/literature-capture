@@ -9,12 +9,21 @@
     <link rel="stylesheet" href="/static/css/review.css" />
   </head>
   <body class="review-page">
+    <!-- Single flex child under shell nav so header never steals vertical space -->
+    <div class="review-root">
     <header class="review-header">
       <div class="rh-left">
-        <a class="brand" href="/">← 文库</a>
-        <a class="brand" href="/capture">截取</a>
         <h1>表格校对</h1>
-        <p class="hint">Y/1 通过 · N/2 不通过 · Tab 下一项 · Shift+Tab 上一项 · S 跳过 · R 重提</p>
+        <p
+          class="hint rh-keys"
+          title="Y/1 通过 · N/2 不通过 · Tab 下一项 · Shift+Tab 上一项 · S 跳过 · R 重提"
+        >
+          <kbd>Y</kbd> 通过
+          <kbd>N</kbd> 不通过
+          <kbd>Tab</kbd> 下一项
+          <kbd>S</kbd> 跳过
+          <kbd>R</kbd> 重提
+        </p>
       </div>
       <div class="rh-stats" id="stats-bar">
         <span class="stat"><b id="st-remaining">—</b> 待校对</span>
@@ -120,6 +129,7 @@
 
     <div id="toast" class="toast" hidden></div>
     <div id="loading-mask" class="loading-mask">处理中…</div>
+    </div><!-- /.review-root -->
 
     <script src="/static/js/shell.js"></script>
     <script src="/static/js/review.js"></script>

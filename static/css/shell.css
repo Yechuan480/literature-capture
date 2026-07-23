@@ -93,6 +93,7 @@ body.has-shell.settings-scroll > .settings-scroll-root {
 /* When shell sits above existing full-height layouts */
 body.has-shell.review-page {
   height: 100vh;
+  max-height: 100vh;
 }
 
 body.has-shell .layout {
@@ -100,15 +101,17 @@ body.has-shell .layout {
   max-height: calc(100vh - 42px);
 }
 
-/* Library / reader already manage their own height under the flex child */
+/* Library / reader / review: one flex child fills remaining viewport under nav */
 body.has-shell.library-page,
-body.has-shell.reader-page {
+body.has-shell.reader-page,
+body.has-shell.review-page {
   height: 100vh;
   max-height: 100vh;
 }
 
 body.has-shell.library-page > .library-layout,
-body.has-shell.reader-page > .reader-root {
+body.has-shell.reader-page > .reader-root,
+body.has-shell.review-page > .review-root {
   flex: 1;
   min-height: 0;
 }
