@@ -710,15 +710,25 @@
     });
     $("btn-today-all").addEventListener("click", () => {
       const boxes = document.querySelectorAll("#today-list .t-check:not(:disabled)");
-      const allOn = Array.from(boxes).every((el) => el.checked);
+      const allOn =
+        boxes.length > 0 && Array.from(boxes).every((el) => el.checked);
       boxes.forEach((el) => {
         el.checked = !allOn;
       });
       setTodayStatus(
         allOn
           ? "已取消全选"
-          : `已全选 ${boxes.length} 条（可保留下载或忽略）`
+          : `已全选 ${boxes.length} 条（可保留下载、忽略或删除）`
       );
+    });
+    $("btn-today-invert").addEventListener("click", () => {
+      const boxes = document.querySelectorAll("#today-list .t-check:not(:disabled)");
+      let n = 0;
+      boxes.forEach((el) => {
+        el.checked = !el.checked;
+        if (el.checked) n += 1;
+      });
+      setTodayStatus(`已反选 · 当前勾选 ${n} 条`);
     });
     $("btn-today-dismiss").addEventListener("click", async () => {
       const ids = selectedTodayIds();
@@ -734,6 +744,31 @@
         });
         await loadToday();
         setTodayStatus(`已忽略 ${ids.length} 条`);
+      } catch (e) {
+        setTodayStatus(e.message);
+      }
+    });
+    $("btn-today-delete").addEventListener("click", async () => {
+      const ids = selectedTodayIds();
+      if (!ids.length) {
+        setTodayStatus("请先勾选要删除的条目");
+        return;
+      }
+      if (!confirm(`从今日待读中删除 ${ids.length} 条？\n（不会删除已下载的 PDF 文件）`)) {
+        return;
+      }
+      try {
+        const r = await api("/api/scholar/inbox/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids }),
+        });
+        await loadToday();
+        const skipped = r.skipped_fetching || 0;
+        setTodayStatus(
+          `已删除 ${r.deleted || 0} 条` +
+            (skipped ? ` · ${skipped} 条下载中跳过` : "")
+        );
       } catch (e) {
         setTodayStatus(e.message);
       }

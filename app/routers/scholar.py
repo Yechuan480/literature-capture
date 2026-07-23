@@ -37,6 +37,11 @@ class DecideBody(BaseModel):
     day: str | None = None
 
 
+class DeleteBody(BaseModel):
+    ids: list[str] = Field(default_factory=list)
+    day: str | None = None
+
+
 class FetchBody(BaseModel):
     ids: list[str] | None = None
     day: str | None = None
@@ -104,6 +109,16 @@ def inbox_decide(body: DecideBody):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return data
+
+
+@router.post("/inbox/delete")
+def inbox_delete(body: DeleteBody):
+    """Permanently remove selected 今日待读 rows (not the PDF files)."""
+    if not body.ids:
+        raise HTTPException(status_code=400, detail="请选择条目")
+    data = inbox_store.delete_items(ids=body.ids, day=body.day)
+    pending = sum(1 for it in data["items"] if it.get("status") == "pending")
+    return {**data, "pending_count": pending}
 
 
 @router.post("/inbox/fetch-pdfs")

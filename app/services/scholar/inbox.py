@@ -335,6 +335,42 @@ def decide_items(
         return {"date": day, "changed": changed, "items": items}
 
 
+def delete_items(
+    *,
+    ids: list[str],
+    day: str | None = None,
+) -> dict[str, Any]:
+    """Permanently remove inbox rows by id (does not touch downloaded PDFs)."""
+    day = day or _today()
+    idset = {i for i in ids if i}
+    if not idset:
+        return {"date": day, "deleted": 0, "items": get_day(day)["items"]}
+    with _LOCK:
+        store = _load()
+        bucket = store["days"].get(day) or {"date": day, "items": [], "refreshed_at": None}
+        before = list(bucket.get("items") or [])
+        kept = [it for it in before if it.get("id") not in idset]
+        deleted = len(before) - len(kept)
+        # skip items currently fetching
+        fetching = {
+            it.get("id")
+            for it in before
+            if it.get("id") in idset and it.get("status") == "fetching"
+        }
+        if fetching:
+            kept = [it for it in before if it.get("id") not in idset or it.get("id") in fetching]
+            deleted = len(before) - len(kept)
+        bucket["items"] = kept
+        store["days"][day] = bucket
+        _save(store)
+        return {
+            "date": day,
+            "deleted": deleted,
+            "skipped_fetching": len(fetching),
+            "items": kept,
+        }
+
+
 def patch_item(item_id: str, fields: dict[str, Any], *, day: str | None = None) -> dict[str, Any] | None:
     day = day or _today()
     with _LOCK:
