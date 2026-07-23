@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import email
 import imaplib
 import re
@@ -59,8 +60,48 @@ def _body_text(msg: Message) -> str:
     return "\n".join(plain_parts)
 
 
+def _imap_open(
+    host: str,
+    port: int,
+    *,
+    use_ssl: bool,
+    timeout: float = 15.0,
+) -> imaplib.IMAP4:
+    """Open IMAP with a hard socket timeout (avoid hanging on large SEARCH)."""
+    # timeout is supported on Python 3.9+ for IMAP4/IMAP4_SSL
+    if use_ssl:
+        return imaplib.IMAP4_SSL(host, port, timeout=timeout)
+    return imaplib.IMAP4(host, port, timeout=timeout)
+
+
+def _folder_message_count(M: imaplib.IMAP4, folder: str) -> int | None:
+    """Prefer STATUS over SEARCH ALL (SEARCH ALL is slow/hangs on large boxes)."""
+    try:
+        # STATUS needs mailbox name; quote if spaces
+        name = folder if re.match(r"^[\w.-]+$", folder) else f'"{folder}"'
+        typ, data = M.status(name, "(MESSAGES)")
+        if typ == "OK" and data:
+            raw = data[0]
+            if isinstance(raw, bytes):
+                raw = raw.decode("utf-8", errors="replace")
+            m = re.search(r"MESSAGES\s+(\d+)", str(raw), re.I)
+            if m:
+                return int(m.group(1))
+    except Exception:
+        pass
+    # SELECT response often has EXISTS in untagged; imaplib stores in M._mbox_size-ish
+    try:
+        # After select, some servers expose via noop
+        typ, data = M.noop()
+        void = typ, data
+        del void
+    except Exception:
+        pass
+    return None
+
+
 def test_connection() -> dict[str, Any]:
-    """Login + optional SELECT + peek last message subject."""
+    """Login + SELECT only (no SEARCH ALL). Fast fail on network hang."""
     cfg = load_email_settings(force=True)
     host = (cfg.get("host") or "").strip()
     port = int(cfg.get("port") or 993)
@@ -70,44 +111,89 @@ def test_connection() -> dict[str, Any]:
     use_ssl = bool(cfg.get("ssl", True))
     if not host or not user or not password:
         return {"ok": False, "message": "请先填写主机、账号与授权码（应用专用密码）"}
-    try:
-        if use_ssl:
-            M = imaplib.IMAP4_SSL(host, port, timeout=30)
-        else:
-            M = imaplib.IMAP4(host, port, timeout=30)
+
+    # Overall deadline so the HTTP handler cannot stall past ~18s
+    def _run() -> dict[str, Any]:
+        M = _imap_open(host, port, use_ssl=use_ssl, timeout=12.0)
         try:
             M.login(user, password)
-            typ, _ = M.select(folder, readonly=True)
+            typ, data = M.select(folder, readonly=True)
             if typ != "OK":
-                return {"ok": False, "message": f"无法打开文件夹 {folder}"}
-            typ, data = M.search(None, "ALL")
-            ids = (data[0] or b"").split() if data else []
+                return {"ok": False, "message": f"无法打开文件夹 {folder}（检查名称大小写）"}
+            count = _folder_message_count(M, folder)
+            # Optional light peek: only if count known and small path via UID *
             peek = ""
-            if ids:
-                last = ids[-1]
-                typ, msg_data = M.fetch(last, "(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE)])")
-                if typ == "OK" and msg_data and msg_data[0]:
-                    raw = msg_data[0][1] if isinstance(msg_data[0], tuple) else msg_data[0]
-                    if isinstance(raw, bytes):
-                        hdr = email.message_from_bytes(raw)
-                        peek = (
-                            f"From: {_decode_header(hdr.get('From'))} | "
-                            f"Subject: {_decode_header(hdr.get('Subject'))}"
-                        )
+            try:
+                # FETCH the highest recent message without SEARCH ALL
+                typ2, data2 = M.fetch(b"*", "(BODY.PEEK[HEADER.FIELDS (SUBJECT FROM DATE)])")
+                if typ2 == "OK" and data2:
+                    for part in data2:
+                        if isinstance(part, tuple) and len(part) >= 2 and isinstance(part[1], bytes):
+                            hdr = email.message_from_bytes(part[1])
+                            peek = (
+                                f"From: {_decode_header(hdr.get('From'))} | "
+                                f"Subject: {_decode_header(hdr.get('Subject'))}"
+                            )
+                            break
+            except Exception:
+                peek = ""
+            bits = [f"登录成功 · {folder}"]
+            if count is not None:
+                bits.append(f"约 {count} 封")
+            if peek:
+                bits.append(f"最近：{peek[:140]}")
             return {
                 "ok": True,
-                "message": f"登录成功 · {folder} 共 {len(ids)} 封" + (f" · 最近：{peek[:160]}" if peek else ""),
-                "message_count": len(ids),
+                "message": " · ".join(bits),
+                "message_count": count,
             }
         finally:
             try:
                 M.logout()
             except Exception:
-                pass
+                try:
+                    M.shutdown()
+                except Exception:
+                    pass
+
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    try:
+        fut = pool.submit(_run)
+        return fut.result(timeout=18.0)
+    except concurrent.futures.TimeoutError:
+        return {
+            "ok": False,
+            "message": (
+                "IMAP 测试超时（约 18s）。请检查：① 主机/端口（Gmail: imap.gmail.com:993 SSL）；"
+                "② 使用「应用专用密码」而非登录密码；③ 网络/代理是否可访问该主机；"
+                "④ 企业邮箱是否需特定 IMAP 地址。"
+            ),
+        }
     except imaplib.IMAP4.error as e:
-        return {"ok": False, "message": f"IMAP 错误：{e}"}
+        err = str(e)
+        hint = ""
+        low = err.lower()
+        if "auth" in low or "login" in low or "credentials" in low or "invalid" in low:
+            hint = "（认证失败：Gmail 请用 16 位应用专用密码，并开启 IMAP）"
+        return {"ok": False, "message": f"IMAP 错误：{e}{hint}"}
+    except TimeoutError as e:
+        return {
+            "ok": False,
+            "message": f"连接超时：{e}。请确认主机可达且端口未阻断。",
+        }
+    except OSError as e:
+        return {
+            "ok": False,
+            "message": f"网络错误：{e}。无法连上 {host}:{port}（DNS/防火墙/代理？）",
+        }
     except Exception as e:
-        return {"ok": False, "message": f"连接失败：{e}"}
+        return {"ok": False, "message": f"连接失败：{type(e).__name__}: {e}"}
+    finally:
+        # Do not wait on hung sockets — wait=True would re-block after TimeoutError
+        try:
+            pool.shutdown(wait=False, cancel_futures=True)
+        except TypeError:
+            pool.shutdown(wait=False)
 
 
 def fetch_recent_messages(
@@ -130,10 +216,8 @@ def fetch_recent_messages(
     if not host or not user or not password:
         raise RuntimeError("邮箱未配置完整")
 
-    if use_ssl:
-        M = imaplib.IMAP4_SSL(host, port, timeout=60)
-    else:
-        M = imaplib.IMAP4(host, port, timeout=60)
+    # Fetch path: longer timeout than test, but still bounded
+    M = _imap_open(host, port, use_ssl=use_ssl, timeout=45.0)
 
     out: list[dict[str, Any]] = []
     try:
@@ -142,22 +226,40 @@ def fetch_recent_messages(
         if typ != "OK":
             raise RuntimeError(f"无法打开文件夹 {folder}")
 
-        # Prefer SINCE + FROM; fall back to broader search
-        criteria = f'(FROM "{sender}")' if sender else "ALL"
-        try:
-            # SINCE DD-Mon-YYYY
-            from datetime import date, timedelta
+        # Prefer SINCE + FROM; NEVER fall back to SEARCH ALL on huge boxes
+        from datetime import date, timedelta
 
-            since = (date.today() - timedelta(days=max(0, days))).strftime("%d-%b-%Y")
-            criteria = f'(FROM "{sender}" SINCE {since})' if sender else f"(SINCE {since})"
-        except Exception:
-            pass
+        since = (date.today() - timedelta(days=max(0, days))).strftime("%d-%b-%Y")
+        attempts = []
+        if sender:
+            attempts.append(f'(FROM "{sender}" SINCE {since})')
+            attempts.append(f'(FROM "{sender}")')
+        attempts.append(f"(SINCE {since})")
+        # last resort: recent window only via UID — still avoid bare ALL
+        attempts.append("RECENT")
+        attempts.append("UNSEEN")
 
-        typ, data = M.search(None, criteria)
-        if typ != "OK":
-            # fallback: last N
-            typ, data = M.search(None, "ALL")
-        ids = (data[0] or b"").split() if data else []
+        ids: list[bytes] = []
+        last_err = ""
+        for criteria in attempts:
+            try:
+                typ, data = M.search(None, criteria)
+                if typ == "OK" and data and data[0]:
+                    ids = (data[0] or b"").split()
+                    if ids:
+                        break
+            except Exception as e:
+                last_err = str(e)
+                continue
+        if not ids:
+            # Final fallback: take the last `limit` sequence numbers without SEARCH ALL
+            # by probing STATUS count then FETCH range
+            count = _folder_message_count(M, folder) or 0
+            if count > 0:
+                start = max(1, count - limit + 1)
+                ids = [str(i).encode() for i in range(start, count + 1)]
+            elif last_err:
+                raise RuntimeError(f"邮件搜索失败：{last_err}")
         ids = ids[-limit:] if len(ids) > limit else ids
 
         for mid in reversed(ids):  # newest first

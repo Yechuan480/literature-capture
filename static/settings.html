@@ -376,7 +376,9 @@
           </div>
           <div class="tip-box">
             Gmail：Google 账号 → 安全性 → 开启两步验证 → 应用专用密码 → 选择「邮件」生成 16
-            位密码。普通登录密码通常无法用于 IMAP。
+            位密码。普通登录密码通常无法用于 IMAP。测试连接约 15–20 秒内返回（不再全量
+            SEARCH 邮箱）；若超时请检查主机/端口、SSL、应用密码与网络是否可达
+            <code>imap.gmail.com:993</code>。
           </div>
         </section>
 
@@ -759,13 +761,46 @@
         });
         $("btn-em-test").addEventListener("click", async () => {
           const el = $("em-settings-msg");
+          const btn = $("btn-em-test");
           try {
-            msg(el, "测试 IMAP…");
-            const r = await api("/api/scholar/settings/test", { method: "POST" });
+            msg(el, "测试 IMAP（最长约 20 秒）…");
+            if (btn) btn.disabled = true;
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 22000);
+            let r;
+            try {
+              const res = await fetch("/api/scholar/settings/test", {
+                method: "POST",
+                signal: ctrl.signal,
+              });
+              if (!res.ok) {
+                let detail = res.statusText;
+                try {
+                  const j = await res.json();
+                  detail = j.detail || JSON.stringify(j);
+                } catch (_) {}
+                throw new Error(
+                  typeof detail === "string" ? detail : JSON.stringify(detail)
+                );
+              }
+              r = await res.json();
+            } finally {
+              clearTimeout(timer);
+            }
             const t = r.test || r;
             msg(el, t.message || (t.ok ? "成功" : "失败"), t.ok ? "ok" : "warn");
           } catch (e) {
-            msg(el, e.message, "warn");
+            const aborted =
+              e && (e.name === "AbortError" || /abort/i.test(String(e.message || "")));
+            msg(
+              el,
+              aborted
+                ? "前端等待超时。请确认已保存设置、网络可达 imap 主机，Gmail 使用应用专用密码。"
+                : e.message,
+              "warn"
+            );
+          } finally {
+            if (btn) btn.disabled = false;
           }
         });
         $("tr-show-baidu").addEventListener("change", () => {

@@ -335,20 +335,41 @@
       root.innerHTML = `<div class="empty" style="color:var(--muted);padding:1.2rem;text-align:center">暂无条目。请先在设置中配置 IMAP，再点「刷新邮件」。</div>`;
       return;
     }
+    // Preserve prior checks across re-render
+    const prev = new Set(
+      Array.from(document.querySelectorAll("#today-list .t-check:checked")).map(
+        (el) => el.value
+      )
+    );
     root.innerHTML = "";
     for (const it of items) {
-      const row = document.createElement("label");
+      const row = document.createElement("div");
       row.className = "today-item";
+      row.dataset.id = it.id || "";
       const st = it.status || "pending";
-      const canCheck = st === "pending" || st === "kept" || st === "failed" || st === "no_pdf" || st === "paywalled";
+      // Allow re-select for keep/dismiss/retry; only lock while actively fetching
+      const canCheck = st !== "fetching";
+      const checked = prev.has(it.id) && canCheck;
       row.innerHTML = `
-        <input type="checkbox" class="t-check" ${canCheck ? "" : "disabled"} />
-        <div>
+        <div class="t-check-wrap">
+          <input type="checkbox" class="t-check" value="" ${canCheck ? "" : "disabled"} ${checked ? "checked" : ""} aria-label="选择" />
+        </div>
+        <div class="t-body">
           <div class="t-title"></div>
           <div class="t-meta"></div>
           <span class="t-status ${st}"></span>
         </div>`;
-      row.querySelector(".t-check").value = it.id;
+      const cb = row.querySelector(".t-check");
+      cb.value = it.id || "";
+      // Click row (except links) toggles checkbox
+      row.addEventListener("click", (e) => {
+        if (!canCheck) return;
+        if (e.target === cb) return; // native toggle
+        if (e.target.closest("a,button")) return;
+        e.preventDefault();
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event("change", { bubbles: true }));
+      });
       row.querySelector(".t-title").textContent = it.title || "（无标题）";
       const metaBits = [];
       if (it.authors) metaBits.push(it.authors);
@@ -357,6 +378,7 @@
       if (it.error) metaBits.push(it.error);
       row.querySelector(".t-meta").textContent = metaBits.join(" · ") || it.link || "";
       row.querySelector(".t-status").textContent = ST_LABEL[st] || st;
+      if (!canCheck) row.classList.add("is-locked");
       root.appendChild(row);
     }
   }
@@ -485,9 +507,16 @@
       }
     });
     $("btn-today-all").addEventListener("click", () => {
-      document.querySelectorAll("#today-list .t-check:not(:disabled)").forEach((el) => {
-        el.checked = true;
+      const boxes = document.querySelectorAll("#today-list .t-check:not(:disabled)");
+      const allOn = Array.from(boxes).every((el) => el.checked);
+      boxes.forEach((el) => {
+        el.checked = !allOn;
       });
+      setTodayStatus(
+        allOn
+          ? "已取消全选"
+          : `已全选 ${boxes.length} 条（可保留下载或忽略）`
+      );
     });
     $("btn-today-dismiss").addEventListener("click", async () => {
       const ids = selectedTodayIds();
