@@ -120,87 +120,109 @@ button.active {
 
 .toolbar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  padding: 0.75rem 1rem;
+  flex-wrap: nowrap;
+  gap: 0.3rem;
+  padding: 0.35rem 0.55rem;
   border-bottom: 1px solid var(--border);
   align-items: center;
+  flex-shrink: 0;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
 
 .toolbar .spacer,
 .tb-spacer {
-  flex: 1;
-  min-width: 0.5rem;
+  /* Keep groups adjacent — no expanding blank middle */
+  flex: 0 0 0.35rem;
+  min-width: 0.35rem;
+  max-width: 0.45rem;
 }
 
 .toolbar input[type="number"] {
-  width: 3.6rem;
+  width: 2.8rem;
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 6px;
-  padding: 0.35rem 0.4rem;
+  padding: 0.22rem 0.25rem;
   text-align: center;
+  font-size: 0.78rem;
 }
 
-/* Viewer toolbar: grouped controls */
+/* Viewer toolbar: single compact row */
 .viewer-toolbar {
-  gap: 0.55rem;
-  padding: 0.55rem 0.85rem;
+  gap: 0.28rem;
+  padding: 0.28rem 0.45rem;
   background: linear-gradient(180deg, #1c2738 0%, var(--panel) 100%);
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .viewer-toolbar .tb-group {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.2rem;
+  gap: 0.18rem;
+  padding: 0.12rem;
   background: rgba(0, 0, 0, 0.18);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .viewer-toolbar .tb-group button {
-  min-width: 2.1rem;
-  padding: 0.4rem 0.55rem;
+  min-width: 1.7rem;
+  padding: 0.26rem 0.4rem;
+  font-size: 0.78rem;
+  border-radius: 6px;
 }
 
 .viewer-toolbar .tb-capture {
-  gap: 0.35rem;
-  padding: 0.25rem 0.35rem;
+  gap: 0.22rem;
+  padding: 0.12rem 0.2rem;
+  margin-left: auto; /* pin capture actions to the right without a huge spacer */
 }
 
 .viewer-toolbar .tb-capture button {
   min-width: auto;
-  padding: 0.4rem 0.7rem;
+  padding: 0.26rem 0.5rem;
+  font-size: 0.76rem;
 }
 
 .viewer-toolbar .tb-divider {
   width: 1px;
-  height: 1.6rem;
+  height: 1.25rem;
   background: var(--border);
-  flex-shrink: 0;
+  flex: 0 0 1px;
+  align-self: center;
 }
 
 .viewer-toolbar .page-control {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.15rem;
 }
 
 .viewer-toolbar .page-control .hint {
-  min-width: 2.4rem;
+  min-width: 1.6rem;
+  font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
+}
+
+.viewer-toolbar .badge {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.35rem;
 }
 
 .viewer-toolbar .tb-table-nav button {
   min-width: auto;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.78rem;
+  padding: 0.24rem 0.38rem;
+  font-size: 0.72rem;
 }
 
 .viewer-toolbar .table-hit-badge {
-  min-width: 5.2rem;
+  min-width: 4.2rem;
   text-align: center;
   cursor: pointer;
   user-select: none;
@@ -210,6 +232,8 @@ button.active {
   color: var(--accent);
   font-weight: 650;
   letter-spacing: 0.01em;
+  font-size: 0.72rem;
+  padding: 0.18rem 0.35rem;
 }
 
 .viewer-toolbar .table-hit-badge:hover {
