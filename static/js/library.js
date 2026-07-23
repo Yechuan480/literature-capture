@@ -538,13 +538,17 @@
       const name = $("new-col-name").value.trim();
       if (!name) return;
       try {
-        await api("/api/library/collections", {
+        const col = await api("/api/library/collections", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name }),
         });
         $("new-col-name").value = "";
         await loadItems();
+        if (col && col.id) {
+          state.collectionId = col.id;
+          await loadItems();
+        }
       } catch (e) {
         alert(e.message);
       }
@@ -552,6 +556,37 @@
     $("new-col-name").addEventListener("keydown", (e) => {
       if (e.key === "Enter") $("btn-add-col").click();
     });
+    const btnAssign = $("btn-assign-all");
+    if (btnAssign) {
+      btnAssign.addEventListener("click", async () => {
+        const col = (state.collections || []).find((c) => c.id === state.collectionId);
+        if (!col || col.builtin) {
+          alert("请先点选左侧一个自定义集合（非「全部/未读/在读/已读」），再点「全部归入所选」。");
+          return;
+        }
+        if (
+          !confirm(
+            `将 pdfs/ 中全部文献归入集合「${col.name}」？\n（已在集合中的不会重复添加）`
+          )
+        ) {
+          return;
+        }
+        try {
+          btnAssign.disabled = true;
+          const res = await api("/api/library/collections/assign", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ collection_id: col.id, all_pdfs: true }),
+          });
+          await loadItems();
+          alert(res.message || `已归入 ${res.assigned || 0} 篇`);
+        } catch (e) {
+          alert(e.message);
+        } finally {
+          btnAssign.disabled = false;
+        }
+      });
+    }
 
     $("btn-today").addEventListener("click", () => openTodayModal());
     $("btn-today-close").addEventListener("click", () => closeTodayModal());

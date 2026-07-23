@@ -157,6 +157,33 @@ def _google_translate(text: str) -> dict[str, Any]:
         }
 
 
+_BAIDU_ERR_HINTS = {
+    "52001": "请求超时，请重试",
+    "52002": "系统错误，请稍后重试",
+    "52003": "未授权用户：检查 App ID 是否开通通用翻译",
+    "54000": "必填参数为空",
+    "54001": "签名错误：核对 App ID 与密钥",
+    "54003": "访问频率受限",
+    "54004": "账户余额不足",
+    "54005": "长 query 请求频繁，请降低频率",
+    "58000": "客户端 IP 非法：在控制台绑定本机出口 IP",
+    "58001": "译文语言方向不支持",
+    "58002": "服务当前已关闭：控制台开启通用翻译",
+    "90107": "认证未通过或未生效",
+}
+
+
+def _baidu_error_message(code: Any, msg: Any) -> str:
+    code_s = str(code or "").strip()
+    base = f"百度翻译错误 {code_s}"
+    if msg:
+        base += f": {msg}"
+    hint = _BAIDU_ERR_HINTS.get(code_s)
+    if hint:
+        base += f"（{hint}）"
+    return base
+
+
 def _baidu_translate(text: str, cfg: dict[str, Any]) -> dict[str, Any]:
     app_id = (cfg.get("baidu_app_id") or "").strip()
     secret = (cfg.get("baidu_secret") or "").strip()
@@ -188,12 +215,23 @@ def _baidu_translate(text: str, cfg: dict[str, Any]) -> dict[str, Any]:
                         "sign": sign,
                     },
                 )
-                data = res.json()
+                try:
+                    data = res.json()
+                except Exception:
+                    return {
+                        "ok": False,
+                        "translation": "\n".join(out),
+                        "error": f"百度翻译 HTTP {res.status_code}，响应非 JSON",
+                        "model": "baidu",
+                        "provider": "baidu",
+                    }
                 if "error_code" in data:
                     return {
                         "ok": False,
                         "translation": "\n".join(out),
-                        "error": f"百度翻译错误 {data.get('error_code')}: {data.get('error_msg')}",
+                        "error": _baidu_error_message(
+                            data.get("error_code"), data.get("error_msg")
+                        ),
                         "model": "baidu",
                         "provider": "baidu",
                     }
@@ -225,6 +263,51 @@ def _baidu_translate(text: str, cfg: dict[str, Any]) -> dict[str, Any]:
             "model": "baidu",
             "provider": "baidu",
         }
+
+
+def test_baidu_connection(
+    *,
+    app_id: str | None = None,
+    secret: str | None = None,
+) -> dict[str, Any]:
+    """
+    Probe Baidu VIP translate with a short phrase.
+    Optional app_id/secret override saved settings (for test-before-save).
+    """
+    cfg = load_translate_settings(force=True)
+    probe = dict(cfg)
+    if app_id is not None and str(app_id).strip():
+        probe["baidu_app_id"] = str(app_id).strip()
+    if secret is not None and str(secret).strip() and not (
+        "•" in secret or (secret.count("*") >= 4)
+    ):
+        probe["baidu_secret"] = str(secret).strip()
+
+    aid = (probe.get("baidu_app_id") or "").strip()
+    sec = (probe.get("baidu_secret") or "").strip()
+    if not aid or not sec:
+        return {
+            "ok": False,
+            "message": "请先填写百度 App ID 与密钥并保存（或在测试前输入密钥）",
+            "translation": "",
+        }
+
+    sample = "Hello, literature reader."
+    r = _baidu_translate(sample, probe)
+    if r.get("ok"):
+        zh = (r.get("translation") or "").strip()
+        return {
+            "ok": True,
+            "message": f"连接成功 · {sample} → {zh}",
+            "translation": zh,
+            "provider": "baidu",
+        }
+    return {
+        "ok": False,
+        "message": r.get("error") or "百度翻译测试失败",
+        "translation": r.get("translation") or "",
+        "provider": "baidu",
+    }
 
 
 def _cnki_translate(text: str, cfg: dict[str, Any]) -> dict[str, Any]:

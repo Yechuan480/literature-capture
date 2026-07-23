@@ -322,7 +322,7 @@ def create_collection(name: str) -> dict[str, Any]:
     cols = store.setdefault("collections", [])
     for c in cols:
         if (c.get("name") or "").strip() == name and not c.get("builtin"):
-            raise ValueError("同名集合已存在")
+            return c  # idempotent: return existing same-name custom collection
     cid = "c_" + uuid.uuid4().hex[:10]
     col = {
         "id": cid,
@@ -334,6 +334,80 @@ def create_collection(name: str) -> dict[str, Any]:
     store["collections"] = cols
     save_library(store)
     return col
+
+
+def ensure_collection(name: str) -> dict[str, Any]:
+    """Get or create a custom collection by display name (case-sensitive)."""
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("集合名称不能为空")
+    store = load_library(force=True)
+    for c in store.get("collections") or []:
+        if (c.get("name") or "").strip() == name:
+            return c
+    return create_collection(name)
+
+
+def assign_items_to_collection(
+    collection_id: str,
+    *,
+    filenames: list[str] | None = None,
+    all_pdfs: bool = False,
+) -> dict[str, Any]:
+    """
+    Add collection_id to items' collection_ids (union, no remove from others).
+    If all_pdfs=True, assign every PDF on disk; else only given filenames.
+    """
+    store = load_library(force=True)
+    cols = store.get("collections") or []
+    col = next((c for c in cols if c.get("id") == collection_id), None)
+    if not col:
+        raise KeyError("集合不存在")
+    if col.get("builtin") and collection_id in (
+        "all",
+        "unread",
+        "reading",
+        "done",
+        "archived",
+    ):
+        raise ValueError("内置状态集合不能用于批量归类")
+
+    pdfs = list_pdfs()
+    on_disk = {p["filename"] for p in pdfs}
+    if all_pdfs:
+        targets = sorted(on_disk)
+    else:
+        targets = [f for f in (filenames or []) if f in on_disk]
+    if not targets:
+        return {
+            "collection": col,
+            "assigned": 0,
+            "total_targets": 0,
+            "message": "没有可归类的文献",
+        }
+
+    items = store.setdefault("items", {})
+    changed = 0
+    for fn in targets:
+        ov = dict(items.get(fn) or _default_item_overlay(fn))
+        cids = list(ov.get("collection_ids") or [])
+        if collection_id not in cids:
+            cids.append(collection_id)
+            ov["collection_ids"] = cids
+            ov["updated_at"] = utc_now_iso()
+            items[fn] = ov
+            changed += 1
+        elif fn not in items:
+            items[fn] = ov
+    store["items"] = items
+    save_library(store)
+    return {
+        "collection": col,
+        "assigned": changed,
+        "total_targets": len(targets),
+        "already_in": len(targets) - changed,
+        "message": f"已归入「{col.get('name')}」：新增 {changed}，目标 {len(targets)}",
+    }
 
 
 def rename_collection(collection_id: str, name: str) -> dict[str, Any]:

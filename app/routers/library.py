@@ -29,6 +29,18 @@ class ItemPatch(BaseModel):
     translated_pdf: str | None = None
 
 
+class AssignBody(BaseModel):
+    """Bulk-assign PDFs into a collection folder."""
+
+    collection_id: str | None = None
+    name: str | None = Field(
+        default=None,
+        description="若 collection_id 为空则按名称 get-or-create 自定义集合",
+    )
+    filenames: list[str] | None = None
+    all_pdfs: bool = False
+
+
 @router.get("/collections")
 def get_collections():
     return {"collections": lib.list_collections()}
@@ -106,3 +118,28 @@ def sync_library():
         "updated_at": store.get("updated_at"),
         "collections": data["collections"],
     }
+
+
+@router.post("/collections/assign")
+def assign_to_collection(body: AssignBody):
+    """Bulk put items into a classification folder (e.g. Aqueous)."""
+    try:
+        cid = (body.collection_id or "").strip()
+        if not cid:
+            name = (body.name or "").strip()
+            if not name:
+                raise HTTPException(
+                    status_code=400, detail="请提供 collection_id 或 name"
+                )
+            col = lib.ensure_collection(name)
+            cid = col["id"]
+        result = lib.assign_items_to_collection(
+            cid,
+            filenames=body.filenames,
+            all_pdfs=bool(body.all_pdfs),
+        )
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"ok": True, **result}

@@ -452,6 +452,7 @@
             </label>
             <div class="settings-actions">
               <button type="button" class="primary" id="btn-tr-save">保存</button>
+              <button type="button" id="btn-tr-test-baidu">测试百度连接</button>
             </div>
             <div id="tr-settings-msg" class="settings-msg"></div>
           </div>
@@ -461,10 +462,12 @@
             <li><strong>对照译稿</strong>：原文与译稿左右同步翻页</li>
             <li>Shift +「全文翻译」可强制重译</li>
             <li>扫描件无文本层时区域翻译可走 AI 视觉；全文任务需要可提取文本</li>
+            <li>「测试百度连接」会用短句调用通用翻译 API 校验 App ID / 密钥</li>
           </ul>
           <div class="tip-box">
             百度：<a href="https://fanyi-api.baidu.com/" target="_blank" rel="noopener">翻译开放平台</a>
-            通用翻译 API。Google 为非官方 gtx 端点，可能限流。CNKI 官方接口常需账号权限，失败时请改用其他引擎。
+            通用翻译 API。测试前请先保存 App ID 与密钥，或在密钥框中临时填写再点测试。
+            Google 为非官方 gtx 端点，可能限流。CNKI 官方接口常需账号权限，失败时请改用其他引擎。
             密钥存 <code>data/translate_settings.json</code>，不入库。
           </div>
         </section>
@@ -841,6 +844,31 @@
             await load();
           } catch (e) {
             msg(el, e.message, "warn");
+          }
+        });
+        $("btn-tr-test-baidu").addEventListener("click", async () => {
+          const el = $("tr-settings-msg");
+          const btn = $("btn-tr-test-baidu");
+          try {
+            if (btn) btn.disabled = true;
+            msg(el, "正在测试百度翻译…");
+            const body = {
+              baidu_app_id: $("tr-baidu-app-id").value.trim() || undefined,
+            };
+            const secret = $("tr-baidu-secret").value.trim();
+            if (secret) body.baidu_secret = secret;
+            const res = await api("/api/translate/settings/test-baidu", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+            const t = res.test || {};
+            if (t.ok) msg(el, t.message || "连接成功", "ok");
+            else msg(el, t.message || "测试失败", "warn");
+          } catch (e) {
+            msg(el, e.message, "warn");
+          } finally {
+            if (btn) btn.disabled = false;
           }
         });
         load().catch((e) => msg($("ai-settings-msg"), e.message, "warn"));

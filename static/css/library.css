@@ -339,6 +339,21 @@
   gap: 0.25rem;
 }
 
+.col-actions.col-assign {
+  padding-top: 0.25rem;
+  border-top: none;
+}
+
+.col-actions.col-assign button {
+  width: 100%;
+  font-size: 0.66rem;
+  color: var(--muted);
+}
+
+.col-actions.col-assign button:hover {
+  color: var(--text);
+}
+
 .col-actions input {
   flex: 1;
   min-width: 0;

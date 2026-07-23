@@ -29,7 +29,7 @@ from app.services.extract_table import ocr_status
 settings = get_settings()
 settings.ensure_dirs()
 
-app = FastAPI(title="Literature Reader", version="1.6.8")
+app = FastAPI(title="Literature Reader", version="1.6.9")
 app.include_router(papers.router)
 app.include_router(capture.router)
 app.include_router(settings_router.router)

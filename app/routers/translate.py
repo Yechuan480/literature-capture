@@ -14,6 +14,7 @@ from app.services.translate.full_pdf import (
     translated_path,
 )
 from app.services.translate.region import translate_region
+from app.services.translate.providers import test_baidu_connection
 from app.services.translate.settings import (
     public_translate_status,
     save_translate_settings,
@@ -54,6 +55,14 @@ class TranslateSettingsUpdate(BaseModel):
     clear_cnki_token: bool = False
 
 
+class BaiduTestBody(BaseModel):
+    baidu_app_id: str | None = None
+    baidu_secret: str | None = Field(
+        default=None,
+        description="可选；不填则用已保存密钥",
+    )
+
+
 @router.get("/settings")
 def get_translate_settings():
     return public_translate_status()
@@ -70,6 +79,18 @@ def put_translate_settings(body: TranslateSettingsUpdate):
         clear_cnki_token=body.clear_cnki_token,
     )
     return public_translate_status()
+
+
+@router.post("/settings/test-baidu")
+def post_test_baidu(body: BaiduTestBody | None = None):
+    """Probe Baidu translate API with saved or form credentials."""
+    body = body or BaiduTestBody()
+    result = test_baidu_connection(
+        app_id=body.baidu_app_id,
+        secret=body.baidu_secret,
+    )
+    status = public_translate_status()
+    return {**status, "test": result}
 
 
 @router.post("/region")
