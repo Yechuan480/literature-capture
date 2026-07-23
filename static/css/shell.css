@@ -77,6 +77,19 @@ body.has-shell > .app-shell-nav + * {
   min-height: 0;
 }
 
+/* Scrollable pages (settings): allow the content pane to scroll */
+body.has-shell.settings-scroll {
+  overflow: hidden;
+}
+
+body.has-shell.settings-scroll > .settings-scroll-root {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* When shell sits above existing full-height layouts */
 body.has-shell.review-page {
   height: 100vh;
@@ -85,4 +98,17 @@ body.has-shell.review-page {
 body.has-shell .layout {
   height: calc(100vh - 42px);
   max-height: calc(100vh - 42px);
+}
+
+/* Library / reader already manage their own height under the flex child */
+body.has-shell.library-page,
+body.has-shell.reader-page {
+  height: 100vh;
+  max-height: 100vh;
+}
+
+body.has-shell.library-page > .library-layout,
+body.has-shell.reader-page > .reader-root {
+  flex: 1;
+  min-height: 0;
 }

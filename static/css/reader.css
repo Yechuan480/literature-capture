@@ -1,8 +1,18 @@
-/* PDF reader page */
+/* PDF reader page — fills viewport under shell nav; PDF stage is primary */
 
-.reader-page {
+body.reader-page {
   height: 100vh;
   max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* Single flex child under shell nav (shell sets flex:1 on first sibling) */
+.reader-root {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -13,75 +23,91 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem 0.5rem;
-  padding: 0.4rem 0.65rem;
+  gap: 0.25rem 0.35rem;
+  padding: 0.28rem 0.5rem;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  max-height: none;
+}
+
+.reader-toolbar[hidden] {
+  display: none !important;
 }
 
 .reader-toolbar .tb-group {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.2rem;
 }
 
 .reader-toolbar .tb-divider {
   width: 1px;
-  height: 1.2rem;
+  height: 1.1rem;
   background: var(--border);
-  margin: 0 0.15rem;
+  margin: 0 0.1rem;
+  flex-shrink: 0;
 }
 
 .reader-toolbar button {
-  padding: 0.28rem 0.5rem;
-  font-size: 0.78rem;
+  padding: 0.22rem 0.42rem;
+  font-size: 0.74rem;
 }
 
 .reader-toolbar .badge {
-  font-size: 0.72rem;
-  padding: 0.15rem 0.4rem;
+  font-size: 0.68rem;
+  padding: 0.1rem 0.32rem;
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--muted);
-  min-width: 3rem;
+  min-width: 2.6rem;
   text-align: center;
 }
 
 .reader-toolbar .page-control {
   display: flex;
   align-items: center;
-  gap: 0.2rem;
+  gap: 0.15rem;
 }
 
 .reader-toolbar .page-control input {
-  width: 3.2rem;
+  width: 2.8rem;
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 6px;
-  padding: 0.25rem 0.3rem;
-  font-size: 0.78rem;
+  padding: 0.18rem 0.22rem;
+  font-size: 0.74rem;
   text-align: center;
 }
 
+.reader-toolbar .hint {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
 .reader-title {
-  flex: 1;
-  min-width: 8rem;
-  font-size: 0.8rem;
+  flex: 1 1 6rem;
+  min-width: 4rem;
+  font-size: 0.74rem;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* PDF area takes all remaining height */
 .reader-stage-wrap {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
   background: #0a0e14;
   display: flex;
   flex-direction: column;
+}
+
+.reader-stage-wrap[hidden] {
+  display: none !important;
 }
 
 .reader-compare {
@@ -104,7 +130,7 @@
   flex: 1;
 }
 
-.reader-page.compare-on .reader-pane.pane-orig {
+body.reader-page.compare-on .reader-pane.pane-orig {
   border-right: 1px solid var(--border);
 }
 
@@ -115,8 +141,8 @@
 
 .pane-label {
   flex-shrink: 0;
-  padding: 0.28rem 0.65rem;
-  font-size: 0.7rem;
+  padding: 0.22rem 0.55rem;
+  font-size: 0.68rem;
   font-weight: 600;
   color: var(--muted);
   background: rgba(0, 0, 0, 0.28);
@@ -124,7 +150,7 @@
   letter-spacing: 0.02em;
 }
 
-.reader-page:not(.compare-on) .pane-label {
+body.reader-page:not(.compare-on) .pane-label {
   display: none;
 }
 
@@ -135,7 +161,7 @@
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 0.75rem;
+  padding: 0.55rem;
 }
 
 .reader-stage {
@@ -157,22 +183,36 @@
   pointer-events: none;
 }
 
+/* Empty state only fills when no PDF; never competes with stage */
 .reader-empty {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   color: var(--muted);
-  gap: 0.75rem;
-  padding: 2rem;
+  gap: 0.5rem;
+  padding: 1.25rem;
   text-align: center;
+}
+
+.reader-empty[hidden] {
+  display: none !important;
 }
 
 .reader-empty h2 {
   margin: 0;
   color: var(--text);
-  font-size: 1.05rem;
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+
+.reader-empty p {
+  margin: 0;
+  max-width: 28rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
 }
 
 .reader-empty a {
@@ -180,12 +220,15 @@
 }
 
 .reader-status {
-  flex-shrink: 0;
-  padding: 0.3rem 0.75rem;
-  font-size: 0.72rem;
+  flex: 0 0 auto;
+  padding: 0.22rem 0.65rem;
+  font-size: 0.7rem;
   color: var(--muted);
   border-top: 1px solid var(--border);
   background: var(--panel);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .reader-stage .loading-mask {
@@ -242,10 +285,10 @@
 .tr-panel {
   position: fixed;
   left: 50%;
-  bottom: 2.6rem;
+  bottom: 2.4rem;
   transform: translateX(-50%);
   width: min(52rem, calc(100vw - 1.5rem));
-  max-height: min(48vh, 22rem);
+  max-height: min(42vh, 20rem);
   display: flex;
   flex-direction: column;
   background: var(--panel);
@@ -264,9 +307,9 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.45rem 0.7rem;
+  padding: 0.4rem 0.65rem;
   border-bottom: 1px solid var(--border);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   flex-shrink: 0;
   background: rgba(0, 0, 0, 0.18);
 }
@@ -274,7 +317,7 @@
 .tr-panel-head .tr-meta {
   flex: 1;
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -286,8 +329,8 @@
 }
 
 .tr-panel-head button {
-  padding: 0.2rem 0.45rem;
-  font-size: 0.72rem;
+  padding: 0.18rem 0.4rem;
+  font-size: 0.7rem;
 }
 
 .tr-compare {
@@ -312,8 +355,8 @@
 
 .tr-col-label {
   flex-shrink: 0;
-  padding: 0.28rem 0.65rem;
-  font-size: 0.68rem;
+  padding: 0.22rem 0.55rem;
+  font-size: 0.66rem;
   font-weight: 650;
   color: var(--muted);
   background: rgba(0, 0, 0, 0.14);
@@ -324,8 +367,8 @@
 .tr-body {
   flex: 1;
   min-height: 0;
-  padding: 0.55rem 0.7rem;
-  font-size: 0.82rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.8rem;
   line-height: 1.5;
   overflow: auto;
   white-space: pre-wrap;
@@ -334,7 +377,7 @@
 
 .tr-src {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
 }
 
 .tr-body {
@@ -342,11 +385,11 @@
 }
 
 @media (max-width: 720px) {
-  .reader-page.compare-on .reader-compare {
+  body.reader-page.compare-on .reader-compare {
     flex-direction: column;
   }
 
-  .reader-page.compare-on .reader-pane.pane-orig {
+  body.reader-page.compare-on .reader-pane.pane-orig {
     border-right: none;
     border-bottom: 1px solid var(--border);
     max-height: 50%;

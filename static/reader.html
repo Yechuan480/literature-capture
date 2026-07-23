@@ -9,85 +9,91 @@
     <link rel="stylesheet" href="/static/css/reader.css" />
   </head>
   <body class="reader-page">
-    <div class="reader-toolbar" id="reader-toolbar" hidden>
-      <div class="tb-group" role="group" aria-label="翻页">
-        <button type="button" id="btn-prev" title="上一页">‹</button>
-        <div class="page-control">
-          <input type="number" id="page-input" min="1" value="1" />
-          <span id="page-total" class="hint">/ 0</span>
+    <!-- Single flex child under shell nav so toolbar never steals vertical space -->
+    <div class="reader-root">
+      <div class="reader-toolbar" id="reader-toolbar" hidden>
+        <div class="tb-group" role="group" aria-label="翻页">
+          <button type="button" id="btn-prev" title="上一页">‹</button>
+          <div class="page-control">
+            <input type="number" id="page-input" min="1" value="1" />
+            <span id="page-total" class="hint">/ 0</span>
+          </div>
+          <button type="button" id="btn-next" title="下一页">›</button>
         </div>
-        <button type="button" id="btn-next" title="下一页">›</button>
+        <div class="tb-divider" aria-hidden="true"></div>
+        <div class="tb-group" role="group" aria-label="缩放">
+          <button type="button" id="btn-zoom-out" title="缩小">−</button>
+          <span id="zoom-label" class="badge">125%</span>
+          <button type="button" id="btn-zoom-in" title="放大">+</button>
+        </div>
+        <div class="tb-divider" aria-hidden="true"></div>
+        <div class="tb-group" role="group" aria-label="旋转">
+          <button type="button" id="btn-rotate-ccw" title="逆时针">↺</button>
+          <span id="rotation-label" class="badge">0°</span>
+          <button type="button" id="btn-rotate-cw" title="顺时针">↻</button>
+        </div>
+        <div class="tb-divider" aria-hidden="true"></div>
+        <div class="tb-group" role="group" aria-label="翻译">
+          <button type="button" id="btn-tr-region" title="框选区域翻译为中文（左右对照）">
+            框选翻译
+          </button>
+          <button type="button" id="btn-tr-run" title="翻译当前选区" class="primary" hidden>
+            译选区
+          </button>
+          <button type="button" id="btn-tr-cancel" class="ghost" hidden>取消</button>
+          <button type="button" id="btn-tr-full" title="全文机译 → 新 PDF（zh-CN）">
+            全文翻译
+          </button>
+          <button type="button" id="btn-tr-open" title="左右对照原文与译稿" hidden>
+            对照译稿
+          </button>
+        </div>
+        <div class="tb-divider" aria-hidden="true"></div>
+        <div class="tb-group">
+          <button type="button" id="btn-to-capture">截取表格</button>
+          <button type="button" id="btn-mark-reading">标为在读</button>
+          <button type="button" id="btn-mark-done">标为已读</button>
+        </div>
+        <span class="reader-title" id="reader-title">—</span>
       </div>
-      <div class="tb-divider" aria-hidden="true"></div>
-      <div class="tb-group" role="group" aria-label="缩放">
-        <button type="button" id="btn-zoom-out" title="缩小">−</button>
-        <span id="zoom-label" class="badge">125%</span>
-        <button type="button" id="btn-zoom-in" title="放大">+</button>
-      </div>
-      <div class="tb-divider" aria-hidden="true"></div>
-      <div class="tb-group" role="group" aria-label="旋转">
-        <button type="button" id="btn-rotate-ccw" title="逆时针">↺</button>
-        <span id="rotation-label" class="badge">0°</span>
-        <button type="button" id="btn-rotate-cw" title="顺时针">↻</button>
-      </div>
-      <div class="tb-divider" aria-hidden="true"></div>
-      <div class="tb-group" role="group" aria-label="翻译">
-        <button type="button" id="btn-tr-region" title="框选区域翻译为中文（左右对照）">
-          框选翻译
-        </button>
-        <button type="button" id="btn-tr-run" title="翻译当前选区" class="primary" hidden>
-          译选区
-        </button>
-        <button type="button" id="btn-tr-cancel" class="ghost" hidden>取消</button>
-        <button type="button" id="btn-tr-full" title="全文机译 → 新 PDF（zh-CN）">
-          全文翻译
-        </button>
-        <button type="button" id="btn-tr-open" title="左右对照原文与译稿" hidden>
-          对照译稿
-        </button>
-      </div>
-      <div class="tb-divider" aria-hidden="true"></div>
-      <div class="tb-group">
-        <button type="button" id="btn-to-capture">截取表格</button>
-        <button type="button" id="btn-mark-reading">标为在读</button>
-        <button type="button" id="btn-mark-done">标为已读</button>
-      </div>
-      <span class="reader-title" id="reader-title">—</span>
-    </div>
 
-    <div class="reader-empty" id="reader-empty">
-      <h2>选择一篇文献开始阅读</h2>
-      <p>从<a href="/">文库</a>双击打开，或在地址栏使用 <code>/read?f=文件名.pdf</code></p>
-    </div>
+      <div class="reader-empty" id="reader-empty">
+        <h2>选择一篇文献开始阅读</h2>
+        <p>
+          从<a href="/">文库</a>双击打开，或使用
+          <code>/read?f=文件名.pdf</code>
+        </p>
+      </div>
 
-    <div class="reader-stage-wrap" id="reader-stage-wrap" hidden>
-      <div class="reader-compare" id="reader-compare">
-        <div class="reader-pane pane-orig">
-          <div class="pane-label" id="pane-label-orig">原文</div>
-          <div class="pane-scroll">
-            <div class="reader-stage canvas-stage" id="reader-stage">
-              <canvas id="pdf-canvas"></canvas>
-              <div id="highlight-layer" aria-hidden="true"></div>
-              <div id="select-overlay">
-                <div id="select-rect"></div>
+      <div class="reader-stage-wrap" id="reader-stage-wrap" hidden>
+        <div class="reader-compare" id="reader-compare">
+          <div class="reader-pane pane-orig">
+            <div class="pane-label" id="pane-label-orig">原文</div>
+            <div class="pane-scroll">
+              <div class="reader-stage canvas-stage" id="reader-stage">
+                <canvas id="pdf-canvas"></canvas>
+                <div id="highlight-layer" aria-hidden="true"></div>
+                <div id="select-overlay">
+                  <div id="select-rect"></div>
+                </div>
+                <div id="loading-mask" class="loading-mask">加载中…</div>
               </div>
-              <div id="loading-mask" class="loading-mask">加载中…</div>
             </div>
           </div>
-        </div>
-        <div class="reader-pane pane-zh" id="pane-zh" hidden>
-          <div class="pane-label">译稿 · zh-CN</div>
-          <div class="pane-scroll">
-            <div class="reader-stage canvas-stage" id="reader-stage-zh">
-              <canvas id="pdf-canvas-zh"></canvas>
-              <div id="loading-mask-zh" class="loading-mask">加载中…</div>
+          <div class="reader-pane pane-zh" id="pane-zh" hidden>
+            <div class="pane-label">译稿 · zh-CN</div>
+            <div class="pane-scroll">
+              <div class="reader-stage canvas-stage" id="reader-stage-zh">
+                <canvas id="pdf-canvas-zh"></canvas>
+                <div id="loading-mask-zh" class="loading-mask">加载中…</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="reader-status" id="status-text">就绪</div>
+      <div class="reader-status" id="status-text">就绪</div>
+    </div>
 
     <aside class="tr-panel" id="tr-panel" hidden>
       <div class="tr-panel-head">

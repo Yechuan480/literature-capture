@@ -7,10 +7,17 @@
     <link rel="stylesheet" href="/static/css/app.css" />
     <link rel="stylesheet" href="/static/css/shell.css" />
     <style>
+      .settings-scroll-root {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+      }
       .settings-page {
         max-width: 48rem;
         margin: 0 auto;
-        padding: 1rem 1rem 3rem;
+        padding: 1rem 1rem 4rem;
       }
       .settings-page h1 {
         font-size: 1.1rem;
@@ -221,7 +228,8 @@
       }
     </style>
   </head>
-  <body>
+  <body class="settings-scroll">
+    <div class="settings-scroll-root">
     <div class="settings-page">
       <h1>设置</h1>
       <p class="lead">
@@ -479,6 +487,7 @@
           </ul>
         </section>
       </div>
+    </div>
     </div>
 
     <script src="/static/js/shell.js"></script>
