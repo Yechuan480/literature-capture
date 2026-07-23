@@ -31,6 +31,16 @@
         <button type="button" id="btn-rotate-cw" title="顺时针">↻</button>
       </div>
       <div class="tb-divider" aria-hidden="true"></div>
+      <div class="tb-group" role="group" aria-label="翻译">
+        <button type="button" id="btn-tr-region" title="框选区域翻译为中文">框选翻译</button>
+        <button type="button" id="btn-tr-run" title="翻译当前选区" class="primary" hidden>
+          译选区
+        </button>
+        <button type="button" id="btn-tr-cancel" class="ghost" hidden>取消</button>
+        <button type="button" id="btn-tr-full" title="全文机译 → 新 PDF（zh-CN）">全文翻译</button>
+        <button type="button" id="btn-tr-open" title="打开已有中文译稿" hidden>打开译稿</button>
+      </div>
+      <div class="tb-divider" aria-hidden="true"></div>
       <div class="tb-group">
         <button type="button" id="btn-to-capture">截取表格</button>
         <button type="button" id="btn-mark-reading">标为在读</button>
@@ -45,17 +55,34 @@
     </div>
 
     <div class="reader-stage-wrap" id="reader-stage-wrap" hidden>
-      <div class="reader-stage" id="reader-stage">
+      <div class="reader-stage canvas-stage" id="reader-stage">
         <canvas id="pdf-canvas"></canvas>
         <div id="highlight-layer" aria-hidden="true"></div>
+        <div id="select-overlay">
+          <div id="select-rect"></div>
+        </div>
         <div id="loading-mask" class="loading-mask">加载中…</div>
       </div>
     </div>
 
     <div class="reader-status" id="status-text">就绪</div>
 
+    <aside class="tr-panel" id="tr-panel" hidden>
+      <div class="tr-panel-head">
+        <strong>区域译文</strong>
+        <span class="tr-meta" id="tr-meta"></span>
+        <div class="tr-actions">
+          <button type="button" id="btn-tr-copy" class="ghost">复制</button>
+          <button type="button" id="btn-tr-close" class="ghost">关闭</button>
+        </div>
+      </div>
+      <div class="tr-src" id="tr-src" hidden></div>
+      <div class="tr-body" id="tr-body"></div>
+    </aside>
+
     <script src="/static/js/shell.js"></script>
     <script src="/static/js/pdf_viewer.js"></script>
+    <script src="/static/js/region_select.js"></script>
     <script src="/static/js/reader.js"></script>
   </body>
 </html>

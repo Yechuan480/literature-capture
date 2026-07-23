@@ -4,7 +4,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)](#环境要求)
 
-本地网页文献阅读器（Zotero 风格初版）：**文库**浏览与阅读状态 → **PDF 阅读** → **表格截取 / 校对** 作为子功能。后续将接入悬浮聊天助手、PDF 翻译、Google 学术邮件推送。
+本地网页文献阅读器（Zotero 风格初版）：**文库**浏览与阅读状态 → **PDF 阅读**（框选/全文中译）→ **表格截取 / 校对** 作为子功能；全站悬浮 AI 助手。后续将接入 Google 学术邮件推送。
 
 > **本仓库只包含应用代码，不包含任何 PDF 文献或截取结果。**  
 > 请将自己的 PDF 放在 `pdfs/` 目录（默认位于应用上一级的文献根目录下）。
@@ -17,9 +17,10 @@
 |------|------|
 | **文库** | `/` 集合 + 文献列表 + 阅读状态 / 标签 / 笔记（`data/library.json`） |
 | **阅读** | `/read?f=` PDF.js 翻页缩放旋转；可标在读/已读，跳转截取 |
+| **PDF 翻译** | 框选区域 → 文本/视觉机译 zh-CN；全文任务 → `*.zh-CN.pdf`（reflow） |
 | **表格截取** | `/capture` 框选 PNG → 批量提取 CSV/Excel；SI 开放附件 |
 | **表格校对** | `/review` PNG 与表对比，通过/不通过，多策略重提 |
-| **设置** | `/settings` AI Key（本机 `data/ai_settings.json`）；邮箱/翻译占位 |
+| **设置** | `/settings` AI Key（本机 `data/ai_settings.json`）；邮箱占位 |
 | **悬浮 AI 助手** | 右下角悬浮球；全站可用，结合当前 PDF 上下文；历史存 `data/chat/` |
 | 标题识别 | PDF 元数据 → 首页正文 → 文件名 |
 | **补充材料 SI** | DOI → Crossref / 出版商启发式 → `_captures/{slug}/si/`（不绕过付费墙） |
