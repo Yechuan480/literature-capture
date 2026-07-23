@@ -63,6 +63,42 @@
     return c;
   }
 
+  async function addItemToCollection(filename, collectionId) {
+    if (!filename || !collectionId) return;
+    // load current overlay ids then union
+    let item =
+      (state.items || []).find((x) => x.filename === filename) ||
+      (state._allItems || []).find((x) => x.filename === filename);
+    let cids = item ? [...(item.collection_ids || [])] : [];
+    if (!item) {
+      try {
+        item = await api(`/api/library/items/${encodeURIComponent(filename)}`);
+        cids = [...(item.collection_ids || [])];
+      } catch (_) {
+        cids = [];
+      }
+    }
+    if (cids.includes(collectionId)) {
+      return { already: true, item };
+    }
+    cids.push(collectionId);
+    const updated = await api(`/api/library/items/${encodeURIComponent(filename)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ collection_ids: cids }),
+    });
+    // sync local caches
+    for (const arr of [state.items, state._allItems]) {
+      if (!arr) continue;
+      const i = arr.findIndex((x) => x.filename === filename);
+      if (i >= 0) arr[i] = updated;
+    }
+    if (state.selected && state.selected.filename === filename) {
+      state.selected = updated;
+    }
+    return { already: false, item: updated };
+  }
+
   function renderCollections() {
     const ul = $("col-list");
     ul.innerHTML = "";
@@ -73,6 +109,7 @@
     const cols = state.collections || [];
     for (const col of cols) {
       const li = document.createElement("li");
+      li.dataset.colId = col.id || "";
       if (col.id === state.collectionId) li.classList.add("active");
       const name = document.createElement("span");
       name.textContent = col.name || col.id;
@@ -92,8 +129,56 @@
         state.collectionId = col.id;
         loadItems();
       });
+      // Drop target: only custom collections accept paper drops
       if (!col.builtin) {
-        li.title = "双击删除自定义集合";
+        li.classList.add("drop-col");
+        li.title = "拖入文献可加入此集合 · 双击删除";
+        li.addEventListener("dragover", (e) => {
+          if (![...e.dataTransfer.types].includes("application/x-lit-filename")) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+          li.classList.add("drag-over");
+        });
+        li.addEventListener("dragleave", (e) => {
+          if (!li.contains(e.relatedTarget)) li.classList.remove("drag-over");
+        });
+        li.addEventListener("drop", async (e) => {
+          e.preventDefault();
+          li.classList.remove("drag-over");
+          const fn =
+            e.dataTransfer.getData("application/x-lit-filename") ||
+            e.dataTransfer.getData("text/plain");
+          if (!fn) return;
+          try {
+            const r = await addItemToCollection(fn, col.id);
+            renderCollections();
+            if (state.selected && state.selected.filename === fn) renderDetail();
+            // toast-like via count refresh
+            if (r && r.already) {
+              /* already in */
+            } else {
+              // soft flash
+              li.classList.add("drop-ok");
+              setTimeout(() => li.classList.remove("drop-ok"), 600);
+            }
+            // if viewing this collection, refresh list
+            if (state.collectionId === col.id || state.collectionId === "all") {
+              await loadItems();
+            } else {
+              // still refresh all-items snapshot for counts
+              try {
+                const all = await api("/api/library/items?sync=false");
+                state._allItems = all.items || [];
+                state.collections = all.collections || state.collections;
+                renderCollections();
+              } catch (_) {
+                /* ignore */
+              }
+            }
+          } catch (err) {
+            alert(err.message || "加入集合失败");
+          }
+        });
         li.addEventListener("dblclick", async (e) => {
           e.stopPropagation();
           if (!confirm(`删除集合「${col.name}」？`)) return;
@@ -125,6 +210,9 @@
 
     for (const it of state.items) {
       const tr = document.createElement("tr");
+      tr.draggable = true;
+      tr.dataset.filename = it.filename || "";
+      tr.title = "拖到左侧自定义集合可加入文件夹";
       if (state.selected && state.selected.filename === it.filename) {
         tr.classList.add("active");
       }
@@ -153,6 +241,18 @@
       tr.children[4].textContent = it.filename;
       tr.addEventListener("click", () => selectItem(it));
       tr.addEventListener("dblclick", () => openReader(it.filename));
+      tr.addEventListener("dragstart", (e) => {
+        tr.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "copy";
+        e.dataTransfer.setData("application/x-lit-filename", it.filename);
+        e.dataTransfer.setData("text/plain", it.filename);
+      });
+      tr.addEventListener("dragend", () => {
+        tr.classList.remove("dragging");
+        document
+          .querySelectorAll(".col-list li.drag-over")
+          .forEach((el) => el.classList.remove("drag-over"));
+      });
       tbody.appendChild(tr);
     }
   }
@@ -246,6 +346,12 @@
       rev.href = "/review";
     }
     $("d-save").addEventListener("click", () => saveDetail());
+    // Auto-save when toggling collection checkboxes (no need to click 保存)
+    document.querySelectorAll("#d-cols .d-col").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        saveDetail().catch(() => {});
+      });
+    });
   }
 
   async function saveDetail() {
