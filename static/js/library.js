@@ -496,11 +496,11 @@
       } else {
         titleEl.textContent = title;
       }
-      // Bilingual: show zh under original when different
-      if (titleZh && titleZh !== title) {
+      // Always show the original and Chinese title lines together.
+      if (titleZh) {
         titleZhEl.hidden = false;
+        titleZhEl.innerHTML = "";
         if (link) {
-          titleZhEl.innerHTML = "";
           const az = document.createElement("a");
           az.className = "t-link-zh";
           az.href = link;
@@ -514,8 +514,8 @@
           titleZhEl.textContent = titleZh;
         }
       } else {
-        titleZhEl.hidden = true;
-        titleZhEl.textContent = "";
+        titleZhEl.hidden = false;
+        titleZhEl.textContent = "中文翻译暂不可用";
       }
       const metaEl = row.querySelector(".t-meta");
       metaEl.innerHTML = "";
