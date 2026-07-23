@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>文库 · Literature</title>
+    <link rel="stylesheet" href="/static/css/app.css" />
+    <link rel="stylesheet" href="/static/css/shell.css" />
+    <link rel="stylesheet" href="/static/css/library.css" />
+  </head>
+  <body class="library-page">
+    <div class="library-layout">
+      <aside class="library-collections">
+        <div class="panel-header">
+          <h2>集合</h2>
+        </div>
+        <ul class="col-list" id="col-list"></ul>
+        <div class="col-actions">
+          <input type="text" id="new-col-name" placeholder="新集合名称…" maxlength="40" />
+          <button type="button" id="btn-add-col" title="新建集合">+</button>
+        </div>
+      </aside>
+
+      <section class="library-main">
+        <div class="library-toolbar">
+          <input
+            type="search"
+            id="lib-search"
+            placeholder="搜索标题 / 文件名 / 标签 / DOI…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button type="button" id="btn-sync" title="重新扫描 pdfs/">同步</button>
+          <span class="hint" id="lib-count">—</span>
+        </div>
+        <div class="item-table-wrap">
+          <table class="item-table">
+            <thead>
+              <tr>
+                <th style="width: 4.5rem">状态</th>
+                <th>标题</th>
+                <th style="width: 6rem">截取</th>
+                <th style="width: 5rem">校对</th>
+                <th style="width: 7rem">文件</th>
+              </tr>
+            </thead>
+            <tbody id="item-tbody">
+              <tr>
+                <td colspan="5" class="empty" style="text-align: center; color: var(--muted); padding: 2rem">
+                  加载中…
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <aside class="library-detail" id="detail-panel">
+        <div class="panel-header">
+          <h2>详情</h2>
+        </div>
+        <div class="detail-body" id="detail-body">
+          <div class="empty">选择一篇文献</div>
+        </div>
+      </aside>
+    </div>
+
+    <script src="/static/js/shell.js"></script>
+    <script src="/static/js/library.js"></script>
+  </body>
+</html>

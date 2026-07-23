@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>设置 · Literature</title>
+    <link rel="stylesheet" href="/static/css/app.css" />
+    <link rel="stylesheet" href="/static/css/shell.css" />
+    <style>
+      .settings-page {
+        max-width: 40rem;
+        margin: 0 auto;
+        padding: 1.25rem 1rem 3rem;
+      }
+      .settings-page h1 {
+        font-size: 1.15rem;
+        margin: 0 0 0.35rem;
+      }
+      .settings-page .lead {
+        color: var(--muted);
+        font-size: 0.82rem;
+        margin: 0 0 1.25rem;
+      }
+      .settings-card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0.9rem 1rem;
+        margin-bottom: 0.85rem;
+      }
+      .settings-card h2 {
+        margin: 0 0 0.45rem;
+        font-size: 0.92rem;
+      }
+      .settings-card p {
+        margin: 0;
+        font-size: 0.78rem;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+      .settings-card a {
+        color: var(--accent);
+      }
+      .settings-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+        margin-top: 0.65rem;
+      }
+      .settings-form .field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        font-size: 0.78rem;
+        color: var(--muted);
+      }
+      .settings-form .field input {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 7px;
+        padding: 0.4rem 0.55rem;
+        font-size: 0.82rem;
+      }
+      .settings-form .field-check {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.8rem;
+        color: var(--text);
+      }
+      .settings-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-top: 0.35rem;
+      }
+      #ai-settings-msg {
+        font-size: 0.75rem;
+        color: var(--muted);
+        min-height: 1.2em;
+      }
+      #ai-settings-msg.ok {
+        color: var(--ok);
+      }
+      #ai-settings-msg.warn {
+        color: var(--warn);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="settings-page">
+      <h1>设置</h1>
+      <p class="lead">
+        AI 视觉 / 聊天共用同一套 OpenAI 兼容接口。邮箱推送与翻译将在后续版本接入。
+      </p>
+
+      <section class="settings-card">
+        <h2>AI（视觉提取 · 聊天）</h2>
+        <p>Key 仅保存在本机 <code>data/ai_settings.json</code>，不会提交到 Git。</p>
+        <div class="settings-form">
+          <label class="field-check">
+            <input type="checkbox" id="ai-enabled" /> 启用 AI
+          </label>
+          <label class="field">
+            <span>Base URL</span>
+            <input type="text" id="ai-base-url" placeholder="https://api.openai.com/v1" spellcheck="false" />
+          </label>
+          <label class="field">
+            <span>Model</span>
+            <input type="text" id="ai-model" placeholder="gpt-4o" spellcheck="false" />
+          </label>
+          <label class="field">
+            <span>API Key</span>
+            <input type="password" id="ai-api-key" placeholder="sk-…（留空表示保持不变）" autocomplete="off" spellcheck="false" />
+          </label>
+          <label class="field-check">
+            <input type="checkbox" id="ai-show-key" /> 显示 Key
+          </label>
+          <label class="field-check">
+            <input type="checkbox" id="ai-clear-key" /> 清除已保存的 Key
+          </label>
+          <div class="settings-actions">
+            <button type="button" class="primary" id="btn-ai-save">保存</button>
+            <button type="button" id="btn-ai-test">测试连接</button>
+          </div>
+          <div id="ai-settings-msg"></div>
+        </div>
+      </section>
+
+      <section class="settings-card">
+        <h2>邮箱 · Google 学术推送</h2>
+        <p>即将支持：IMAP + 授权码、今日待读清单、OA 自动拉取 PDF。请关注后续版本。</p>
+      </section>
+
+      <section class="settings-card">
+        <h2>翻译</h2>
+        <p>目标语言固定为 <strong>zh-CN</strong>。框选翻译与全文译稿将在阅读页接入。</p>
+      </section>
+
+      <section class="settings-card">
+        <h2>路径</h2>
+        <p id="path-info">加载中…</p>
+      </section>
+    </div>
+
+    <script src="/static/js/shell.js"></script>
+    <script>
+      (function () {
+        if (window.ShellNav) ShellNav.mount({ active: "settings" });
+        const $ = (id) => document.getElementById(id);
+        function msg(text, kind) {
+          const el = $("ai-settings-msg");
+          el.textContent = text || "";
+          el.className = kind || "";
+        }
+        async function api(path, options) {
+          const res = await fetch(path, options);
+          if (!res.ok) {
+            let detail = res.statusText;
+            try {
+              const j = await res.json();
+              detail = j.detail || JSON.stringify(j);
+            } catch (_) {}
+            throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+          }
+          return res.json();
+        }
+        async function load() {
+          const cfg = await api("/api/config");
+          $("path-info").innerHTML = `
+            文献根目录：<code>${cfg.literature_root || "—"}</code><br/>
+            PDF 目录：<code>${cfg.pdfs_root || "—"}</code><br/>
+            截取目录：<code>${cfg.captures_root || "—"}</code>
+          `;
+          const ai = await api("/api/settings/ai");
+          $("ai-enabled").checked = !!ai.enabled;
+          $("ai-base-url").value = ai.base_url || "";
+          $("ai-model").value = ai.model || "";
+          $("ai-api-key").placeholder = ai.has_key
+            ? "已保存 Key（留空保持不变）"
+            : "sk-…";
+        }
+        $("ai-show-key").addEventListener("change", () => {
+          $("ai-api-key").type = $("ai-show-key").checked ? "text" : "password";
+        });
+        $("btn-ai-save").addEventListener("click", async () => {
+          try {
+            msg("保存中…");
+            const body = {
+              enabled: $("ai-enabled").checked,
+              base_url: $("ai-base-url").value.trim(),
+              model: $("ai-model").value.trim(),
+              clear_key: $("ai-clear-key").checked,
+            };
+            const key = $("ai-api-key").value.trim();
+            if (key) body.api_key = key;
+            await api("/api/settings/ai", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+            $("ai-api-key").value = "";
+            $("ai-clear-key").checked = false;
+            msg("已保存", "ok");
+            await load();
+          } catch (e) {
+            msg(e.message, "warn");
+          }
+        });
+        $("btn-ai-test").addEventListener("click", async () => {
+          try {
+            msg("测试中…");
+            const r = await api("/api/settings/ai/test", { method: "POST" });
+            const t = r.test || r;
+            const ok = !!(t.ok ?? r.ready);
+            msg(t.message || (ok ? "连接成功" : "失败"), ok ? "ok" : "warn");
+          } catch (e) {
+            msg(e.message, "warn");
+          }
+        });
+        load().catch((e) => msg(e.message, "warn"));
+      })();
+    </script>
+  </body>
+</html>

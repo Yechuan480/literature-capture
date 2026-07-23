@@ -1784,10 +1784,16 @@
   }
 
   async function init() {
+    if (window.ShellNav) ShellNav.mount({ active: "capture" });
     bindUi();
     try {
       await loadConfig();
       await loadPapers();
+      const params = new URLSearchParams(window.location.search);
+      const f = params.get("f") || params.get("filename");
+      if (f) {
+        await openPaper(f);
+      }
     } catch (e) {
       setStatus(`初始化失败: ${e.message}`, "warn");
     }

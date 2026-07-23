@@ -3,8 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>文献表格截取工具</title>
+    <title>表格截取 · Literature</title>
     <link rel="stylesheet" href="/static/css/app.css" />
+    <link rel="stylesheet" href="/static/css/shell.css" />
   </head>
   <body>
     <div class="layout">
@@ -12,7 +13,11 @@
         <div class="panel-header">
           <h1>文献表格截取</h1>
           <p>选择 PDF → 自动建会话 / 获取 SI → 框选截图 → 批量提取</p>
-          <p class="hint"><a href="/review" style="color: var(--accent)">→ 进入表格校对</a></p>
+          <p class="hint">
+            <a href="/" style="color: var(--accent)">文库</a>
+            ·
+            <a href="/review" style="color: var(--accent)">表格校对</a>
+          </p>
         </div>
         <div class="sidebar-tools">
           <div class="search-row">
@@ -246,6 +251,7 @@
       </aside>
     </div>
 
+    <script src="/static/js/shell.js"></script>
     <script src="/static/js/pdf_viewer.js"></script>
     <script src="/static/js/region_select.js"></script>
     <script src="/static/js/app.js"></script>

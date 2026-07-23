@@ -460,6 +460,7 @@
   }
 
   async function init() {
+    if (window.ShellNav) ShellNav.mount({ active: "review" });
     bind();
     await loadNext();
   }

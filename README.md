@@ -1,10 +1,10 @@
-# 文献表格截取工具 (Literature Table Capture)
+# Literature · 个人网页文献阅读器
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)](#环境要求)
 
-本地网页工具：打开文献 PDF → 识别/确认标题 → 框选表格区域并保存截图 → **批量提取**表格为 **CSV + Excel**，并支持人工校对与 AI 视觉增强。
+本地网页文献阅读器（Zotero 风格初版）：**文库**浏览与阅读状态 → **PDF 阅读** → **表格截取 / 校对** 作为子功能。后续将接入悬浮聊天助手、PDF 翻译、Google 学术邮件推送。
 
 > **本仓库只包含应用代码，不包含任何 PDF 文献或截取结果。**  
 > 请将自己的 PDF 放在 `pdfs/` 目录（默认位于应用上一级的文献根目录下）。
@@ -15,16 +15,14 @@
 
 | 模块 | 说明 |
 |------|------|
-| PDF 管理 | 扫描 `pdfs/`，侧栏检索/排序，删除文献 |
-| 标题识别 | PDF 元数据 → 首页正文 → 文件名（可手动修改） |
-| **补充材料 SI** | 打开文献自动解析 DOI → Crossref 开放链接 + **出版商页启发式**（Elsevier CDN / Springer·Nature HTML / Wiley·ACS 尽力）→ 下载 SI/表格附件到 `_captures/{slug}/si/`；可手填 DOI/URL 重试 |
-| 预览与框选 | PDF.js 翻页 / 缩放 / 旋转；**手动**拖拽框选截图 |
-| Table 导航 | 自动扫描 `table`/`tables` 所在页，快捷跳转并高亮标注 |
-| **标记截图** | 确认截取仅保存 PNG（不即时 OCR）；侧栏统计本篇已标记区域 |
-| **批量提取** | 「提取表格」对**全部**未提取截图批量跑 AI 视觉 / img2table+Tesseract / RapidOCR（跨文献累加） |
-| 导出 | `{标题}-tableN.png` / `.csv` / `.xlsx`，每篇独立文件夹 |
-| 校对队列 | 提取完成后左右对比 PNG 与表，通过 / 不通过，多策略重提；侧栏可按通过/未通过筛选 |
-| AI 设置 | 网页内填写 OpenAI 兼容接口（Key 仅存本机，不入库） |
+| **文库** | `/` 集合 + 文献列表 + 阅读状态 / 标签 / 笔记（`data/library.json`） |
+| **阅读** | `/read?f=` PDF.js 翻页缩放旋转；可标在读/已读，跳转截取 |
+| **表格截取** | `/capture` 框选 PNG → 批量提取 CSV/Excel；SI 开放附件 |
+| **表格校对** | `/review` PNG 与表对比，通过/不通过，多策略重提 |
+| **设置** | `/settings` AI Key（本机 `data/ai_settings.json`）；邮箱/翻译占位 |
+| 标题识别 | PDF 元数据 → 首页正文 → 文件名 |
+| **补充材料 SI** | DOI → Crossref / 出版商启发式 → `_captures/{slug}/si/`（不绕过付费墙） |
+| 主导航 | 文库 · 阅读 · 截取 · 校对 · 设置 |
 
 ---
 
@@ -64,7 +62,15 @@ mkdir -p ../pdfs
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8765
 ```
 
-浏览器打开：**http://127.0.0.1:8765**
+浏览器打开：**http://127.0.0.1:8765**（默认进入**文库**）
+
+| 路径 | 页面 |
+|------|------|
+| `/` | 文库 |
+| `/read?f=xxx.pdf` | 阅读 |
+| `/capture` | 表格截取（原主页） |
+| `/review` | 表格校对 |
+| `/settings` | 设置 |
 
 > 请勿用 `file://` 直接打开 HTML，必须通过上述服务访问。
 

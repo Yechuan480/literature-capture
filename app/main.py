@@ -1,4 +1,4 @@
-"""FastAPI entrypoint: API + static UI."""
+"""FastAPI entrypoint: API + static UI (library shell + capture/review)."""
 
 from __future__ import annotations
 
@@ -11,20 +11,29 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings
 from app.models.schemas import HealthResponse
-from app.routers import capture, detect, papers, review, settings as settings_router, si
+from app.routers import (
+    capture,
+    detect,
+    library,
+    papers,
+    review,
+    settings as settings_router,
+    si,
+)
 from app.services.ai_settings import ai_ready, public_ai_status
 from app.services.extract_table import ocr_status
 
 settings = get_settings()
 settings.ensure_dirs()
 
-app = FastAPI(title="Literature Table Capture", version="1.3.0")
+app = FastAPI(title="Literature Reader", version="1.4.0")
 app.include_router(papers.router)
 app.include_router(capture.router)
 app.include_router(settings_router.router)
 app.include_router(review.router)
 app.include_router(detect.router)
 app.include_router(si.router)
+app.include_router(library.router)
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -74,6 +83,13 @@ def public_config():
             "enabled": bool(settings.si_enabled),
             "auto_on_open": bool(settings.si_auto_on_open),
         },
+        "features": {
+            "library": True,
+            "reader": True,
+            "chat": False,
+            "translate": False,
+            "scholar": False,
+        },
     }
 
 
@@ -86,18 +102,12 @@ def _asset_v(rel: str) -> str:
         return "1"
 
 
-@app.get("/")
-def index():
-    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
-    for rel in (
-        "css/app.css",
-        "js/pdf_viewer.js",
-        "js/region_select.js",
-        "js/app.js",
-    ):
-        v = _asset_v(rel)
-        html = html.replace(f'href="/static/{rel}"', f'href="/static/{rel}?v={v}"')
-        html = html.replace(f'src="/static/{rel}"', f'src="/static/{rel}?v={v}"')
+def _serve_html(rel: str, assets: list[str]) -> Response:
+    html = (STATIC_DIR / rel).read_text(encoding="utf-8")
+    for asset in assets:
+        v = _asset_v(asset)
+        html = html.replace(f'href="/static/{asset}"', f'href="/static/{asset}?v={v}"')
+        html = html.replace(f'src="/static/{asset}"', f'src="/static/{asset}?v={v}"')
     return Response(
         content=html,
         media_type="text/html; charset=utf-8",
@@ -105,17 +115,63 @@ def index():
     )
 
 
+@app.get("/")
+def library_page():
+    return _serve_html(
+        "library.html",
+        ["css/app.css", "css/shell.css", "css/library.css", "js/shell.js", "js/library.js"],
+    )
+
+
+@app.get("/capture")
+def capture_page():
+    return _serve_html(
+        "index.html",
+        [
+            "css/app.css",
+            "css/shell.css",
+            "js/shell.js",
+            "js/pdf_viewer.js",
+            "js/region_select.js",
+            "js/app.js",
+        ],
+    )
+
+
+@app.get("/read")
+def read_page():
+    return _serve_html(
+        "reader.html",
+        [
+            "css/app.css",
+            "css/shell.css",
+            "css/reader.css",
+            "js/shell.js",
+            "js/pdf_viewer.js",
+            "js/reader.js",
+        ],
+    )
+
+
+@app.get("/settings")
+def settings_page():
+    return _serve_html(
+        "settings.html",
+        ["css/app.css", "css/shell.css", "js/shell.js"],
+    )
+
+
 @app.get("/review")
 def review_page():
-    html = (STATIC_DIR / "review.html").read_text(encoding="utf-8")
-    for rel in ("css/app.css", "css/review.css", "js/review.js"):
-        v = _asset_v(rel)
-        html = html.replace(f'href="/static/{rel}"', f'href="/static/{rel}?v={v}"')
-        html = html.replace(f'src="/static/{rel}"', f'src="/static/{rel}?v={v}"')
-    return Response(
-        content=html,
-        media_type="text/html; charset=utf-8",
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    return _serve_html(
+        "review.html",
+        [
+            "css/app.css",
+            "css/shell.css",
+            "css/review.css",
+            "js/shell.js",
+            "js/review.js",
+        ],
     )
 
 

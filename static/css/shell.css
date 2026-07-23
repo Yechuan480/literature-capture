@@ -1,0 +1,88 @@
+/* Shared app shell: top nav for library / reader / capture / review / settings */
+
+.app-shell-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.55rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.app-shell-nav .shell-brand {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text);
+  text-decoration: none;
+  margin-right: 0.35rem;
+  white-space: nowrap;
+}
+
+.app-shell-nav .shell-brand:hover {
+  color: var(--accent);
+}
+
+.app-shell-nav .shell-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  align-items: center;
+}
+
+.app-shell-nav a.shell-link {
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  line-height: 1.2;
+}
+
+.app-shell-nav a.shell-link:hover {
+  color: var(--text);
+  background: var(--panel-2);
+  border-color: var(--border);
+}
+
+.app-shell-nav a.shell-link.active {
+  color: #082f49;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.app-shell-nav .shell-spacer {
+  flex: 1;
+  min-width: 0.5rem;
+}
+
+.app-shell-nav .shell-meta {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+body.has-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+body.has-shell > .app-shell-nav + * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* When shell sits above existing full-height layouts */
+body.has-shell.review-page {
+  height: 100vh;
+}
+
+body.has-shell .layout {
+  height: calc(100vh - 42px);
+  max-height: calc(100vh - 42px);
+}
