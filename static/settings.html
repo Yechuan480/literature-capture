@@ -8,77 +8,120 @@
     <link rel="stylesheet" href="/static/css/shell.css" />
     <style>
       .settings-page {
-        max-width: 40rem;
+        max-width: 48rem;
         margin: 0 auto;
-        padding: 1.25rem 1rem 3rem;
+        padding: 1rem 1rem 3rem;
       }
       .settings-page h1 {
-        font-size: 1.15rem;
-        margin: 0 0 0.35rem;
+        font-size: 1.1rem;
+        margin: 0 0 0.25rem;
       }
       .settings-page .lead {
         color: var(--muted);
-        font-size: 0.82rem;
-        margin: 0 0 1.25rem;
+        font-size: 0.8rem;
+        margin: 0 0 1rem;
+        line-height: 1.45;
+      }
+      .settings-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+      }
+      @media (min-width: 900px) {
+        .settings-grid.two-col {
+          grid-template-columns: 1fr 1fr;
+          align-items: start;
+        }
       }
       .settings-card {
         background: var(--panel);
         border: 1px solid var(--border);
         border-radius: 10px;
-        padding: 0.9rem 1rem;
-        margin-bottom: 0.85rem;
+        padding: 0.85rem 0.95rem;
       }
       .settings-card h2 {
-        margin: 0 0 0.45rem;
-        font-size: 0.92rem;
+        margin: 0 0 0.35rem;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
       }
-      .settings-card p {
+      .settings-card h2 .chip {
+        font-size: 0.62rem;
+        font-weight: 600;
+        padding: 0.08rem 0.35rem;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
+      .settings-card h2 .chip.ok {
+        color: var(--ok);
+        border-color: rgba(74, 222, 128, 0.45);
+      }
+      .settings-card h2 .chip.warn {
+        color: var(--warn);
+        border-color: rgba(251, 191, 36, 0.45);
+      }
+      .settings-card p,
+      .settings-card li {
         margin: 0;
-        font-size: 0.78rem;
+        font-size: 0.76rem;
         color: var(--muted);
         line-height: 1.45;
       }
       .settings-card a {
         color: var(--accent);
       }
+      .settings-card ul {
+        margin: 0.35rem 0 0;
+        padding-left: 1.1rem;
+      }
+      .settings-card li + li {
+        margin-top: 0.2rem;
+      }
       .settings-form {
         display: flex;
         flex-direction: column;
-        gap: 0.55rem;
-        margin-top: 0.65rem;
+        gap: 0.5rem;
+        margin-top: 0.55rem;
       }
       .settings-form .field {
         display: flex;
         flex-direction: column;
-        gap: 0.2rem;
-        font-size: 0.78rem;
+        gap: 0.18rem;
+        font-size: 0.74rem;
         color: var(--muted);
       }
-      .settings-form .field input {
+      .settings-form .field input,
+      .settings-form .field select {
         background: var(--bg);
         border: 1px solid var(--border);
         color: var(--text);
         border-radius: 7px;
-        padding: 0.4rem 0.55rem;
-        font-size: 0.82rem;
+        padding: 0.38rem 0.5rem;
+        font-size: 0.8rem;
       }
       .settings-form .field-check {
         display: flex;
         align-items: center;
         gap: 0.4rem;
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         color: var(--text);
       }
       .settings-actions {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.4rem;
-        margin-top: 0.35rem;
+        gap: 0.35rem;
+        margin-top: 0.25rem;
+      }
+      .settings-actions button {
+        font-size: 0.76rem;
+        padding: 0.32rem 0.6rem;
       }
       .settings-msg {
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         color: var(--muted);
-        min-height: 1.2em;
+        min-height: 1.15em;
       }
       .settings-msg.ok {
         color: var(--ok);
@@ -88,8 +131,93 @@
       }
       .field-row {
         display: grid;
-        grid-template-columns: 1fr 6rem;
-        gap: 0.5rem;
+        grid-template-columns: 1fr 5.5rem;
+        gap: 0.45rem;
+      }
+      .status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+        gap: 0.4rem;
+        margin-top: 0.55rem;
+      }
+      .status-item {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.4rem 0.5rem;
+      }
+      .status-item .k {
+        font-size: 0.65rem;
+        color: var(--muted);
+      }
+      .status-item .v {
+        font-size: 0.78rem;
+        color: var(--text);
+        margin-top: 0.12rem;
+        word-break: break-all;
+      }
+      .status-item .v.ok {
+        color: var(--ok);
+      }
+      .status-item .v.warn {
+        color: var(--warn);
+      }
+      .kbd {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 0.68rem;
+        padding: 0.05rem 0.28rem;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .shortcut-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0.45rem;
+        font-size: 0.74rem;
+      }
+      .shortcut-table th,
+      .shortcut-table td {
+        text-align: left;
+        padding: 0.28rem 0.3rem;
+        border-bottom: 1px solid rgba(51, 65, 85, 0.45);
+        color: var(--muted);
+      }
+      .shortcut-table th {
+        color: var(--text);
+        font-weight: 600;
+        font-size: 0.7rem;
+      }
+      .path-block code {
+        display: block;
+        font-size: 0.68rem;
+        word-break: break-all;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0.3rem 0.4rem;
+        margin-top: 0.2rem;
+        color: var(--text);
+      }
+      .path-block .path-label {
+        font-size: 0.68rem;
+        color: var(--muted);
+        margin-top: 0.4rem;
+      }
+      .tip-box {
+        margin-top: 0.5rem;
+        padding: 0.45rem 0.55rem;
+        border-radius: 8px;
+        border: 1px solid rgba(56, 189, 248, 0.25);
+        background: rgba(56, 189, 248, 0.06);
+        font-size: 0.72rem;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+      .section-span {
+        grid-column: 1 / -1;
       }
     </style>
   </head>
@@ -97,108 +225,260 @@
     <div class="settings-page">
       <h1>设置</h1>
       <p class="lead">
-        AI 与邮箱凭据仅保存在本机 <code>data/</code>，不会提交到 Git。
+        AI、邮箱凭据与聊天历史仅保存在本机 <code>data/</code>，已 gitignore，不会进入公开仓库。
+        PDF 与截取结果在文献根目录，同样不入库。
       </p>
 
-      <section class="settings-card">
-        <h2>AI（视觉提取 · 聊天 · 翻译）</h2>
-        <p>OpenAI 兼容接口；Key 存 <code>data/ai_settings.json</code>。</p>
-        <div class="settings-form">
-          <label class="field-check">
-            <input type="checkbox" id="ai-enabled" /> 启用 AI
-          </label>
-          <label class="field">
-            <span>Base URL</span>
-            <input type="text" id="ai-base-url" placeholder="https://api.openai.com/v1" spellcheck="false" />
-          </label>
-          <label class="field">
-            <span>Model</span>
-            <input type="text" id="ai-model" placeholder="gpt-4o" spellcheck="false" />
-          </label>
-          <label class="field">
-            <span>API Key</span>
-            <input type="password" id="ai-api-key" placeholder="sk-…（留空表示保持不变）" autocomplete="off" spellcheck="false" />
-          </label>
-          <label class="field-check">
-            <input type="checkbox" id="ai-show-key" /> 显示 Key
-          </label>
-          <label class="field-check">
-            <input type="checkbox" id="ai-clear-key" /> 清除已保存的 Key
-          </label>
-          <div class="settings-actions">
-            <button type="button" class="primary" id="btn-ai-save">保存</button>
-            <button type="button" id="btn-ai-test">测试连接</button>
+      <div class="settings-grid two-col">
+        <section class="settings-card section-span">
+          <h2>系统状态 <span class="chip" id="chip-app">—</span></h2>
+          <p>健康检查与功能开关（来自 <code>/api/config</code> · <code>/api/health</code>）。</p>
+          <div class="status-grid" id="status-grid">
+            <div class="status-item"><div class="k">加载中…</div><div class="v">—</div></div>
           </div>
-          <div id="ai-settings-msg" class="settings-msg"></div>
-        </div>
-      </section>
+        </section>
 
-      <section class="settings-card">
-        <h2>邮箱 · Google 学术推送</h2>
-        <p>
-          通过 IMAP 读取 Scholar Alert（默认 Gmail
-          <code>imap.gmail.com:993</code> +
-          <strong>应用专用密码</strong>）。仅用于生成「今日待读」；下载 PDF 只走开放获取链接，不绕过付费墙。
-        </p>
-        <div class="settings-form">
-          <label class="field-check">
-            <input type="checkbox" id="em-enabled" /> 启用邮箱拉取
-          </label>
-          <div class="field-row">
-            <label class="field">
-              <span>IMAP 主机</span>
-              <input type="text" id="em-host" placeholder="imap.gmail.com" spellcheck="false" />
+        <section class="settings-card">
+          <h2>
+            AI
+            <span class="chip" id="chip-ai">—</span>
+          </h2>
+          <p>
+            OpenAI 兼容接口，用于<strong>视觉表格提取</strong>、<strong>悬浮聊天</strong>、
+            <strong>区域/全文翻译</strong>。Key 存
+            <code>data/ai_settings.json</code>。
+          </p>
+          <div class="settings-form">
+            <label class="field-check">
+              <input type="checkbox" id="ai-enabled" /> 启用 AI
             </label>
             <label class="field">
-              <span>端口</span>
-              <input type="number" id="em-port" value="993" />
+              <span>Base URL</span>
+              <input
+                type="text"
+                id="ai-base-url"
+                placeholder="https://api.openai.com/v1"
+                spellcheck="false"
+              />
             </label>
+            <label class="field">
+              <span>Model</span>
+              <input type="text" id="ai-model" placeholder="gpt-4o" spellcheck="false" />
+            </label>
+            <label class="field">
+              <span>API Key</span>
+              <input
+                type="password"
+                id="ai-api-key"
+                placeholder="sk-…（留空表示保持不变）"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </label>
+            <label class="field-check">
+              <input type="checkbox" id="ai-show-key" /> 显示 Key
+            </label>
+            <label class="field-check">
+              <input type="checkbox" id="ai-clear-key" /> 清除已保存的 Key
+            </label>
+            <div class="settings-actions">
+              <button type="button" class="primary" id="btn-ai-save">保存</button>
+              <button type="button" id="btn-ai-test">测试连接</button>
+            </div>
+            <div id="ai-settings-msg" class="settings-msg"></div>
           </div>
-          <label class="field">
-            <span>账号（邮箱）</span>
-            <input type="email" id="em-user" placeholder="you@gmail.com" autocomplete="username" spellcheck="false" />
-          </label>
-          <label class="field">
-            <span>应用专用密码</span>
-            <input type="password" id="em-password" placeholder="16 位应用密码（留空保持不变）" autocomplete="new-password" spellcheck="false" />
-          </label>
-          <label class="field-check">
-            <input type="checkbox" id="em-show-pw" /> 显示密码
-          </label>
-          <label class="field-check">
-            <input type="checkbox" id="em-clear-pw" /> 清除已保存密码
-          </label>
-          <label class="field">
-            <span>文件夹</span>
-            <input type="text" id="em-folder" placeholder="INBOX" spellcheck="false" />
-          </label>
-          <label class="field">
-            <span>发件人过滤</span>
-            <input type="text" id="em-sender" placeholder="scholaralerts@google.com" spellcheck="false" />
-          </label>
-          <label class="field-check">
-            <input type="checkbox" id="em-ssl" checked /> SSL
-          </label>
-          <div class="settings-actions">
-            <button type="button" class="primary" id="btn-em-save">保存</button>
-            <button type="button" id="btn-em-test">测试 IMAP</button>
+          <div class="tip-box">
+            环境变量种子（可选）：
+            <code>LITERATURE_AI_API_KEY</code>、<code>LITERATURE_AI_ENABLED=true</code>。
+            推荐支持视觉的模型（如 gpt-4o / 兼容多模态）以便扫描件区域翻译与表格 AI 提取。
           </div>
-          <div id="em-settings-msg" class="settings-msg"></div>
-        </div>
-      </section>
+        </section>
 
-      <section class="settings-card">
-        <h2>翻译</h2>
-        <p>
-          目标语言固定为 <strong>zh-CN</strong>。在阅读页使用「框选翻译」或「全文翻译」；译稿保存为
-          <code>*.zh-CN.pdf</code>。
-        </p>
-      </section>
+        <section class="settings-card">
+          <h2>
+            邮箱 · Google 学术
+            <span class="chip" id="chip-email">—</span>
+          </h2>
+          <p>
+            IMAP 读取 Scholar Alert（默认 Gmail
+            <code>imap.gmail.com:993</code> +
+            <strong>应用专用密码</strong>）。仅生成「今日待读」；PDF 只走开放获取，不绕过付费墙。
+          </p>
+          <div class="settings-form">
+            <label class="field-check">
+              <input type="checkbox" id="em-enabled" /> 启用邮箱拉取
+            </label>
+            <div class="field-row">
+              <label class="field">
+                <span>IMAP 主机</span>
+                <input type="text" id="em-host" placeholder="imap.gmail.com" spellcheck="false" />
+              </label>
+              <label class="field">
+                <span>端口</span>
+                <input type="number" id="em-port" value="993" />
+              </label>
+            </div>
+            <label class="field">
+              <span>账号（邮箱）</span>
+              <input
+                type="email"
+                id="em-user"
+                placeholder="you@gmail.com"
+                autocomplete="username"
+                spellcheck="false"
+              />
+            </label>
+            <label class="field">
+              <span>应用专用密码</span>
+              <input
+                type="password"
+                id="em-password"
+                placeholder="16 位应用密码（留空保持不变）"
+                autocomplete="new-password"
+                spellcheck="false"
+              />
+            </label>
+            <label class="field-check">
+              <input type="checkbox" id="em-show-pw" /> 显示密码
+            </label>
+            <label class="field-check">
+              <input type="checkbox" id="em-clear-pw" /> 清除已保存密码
+            </label>
+            <label class="field">
+              <span>文件夹</span>
+              <input type="text" id="em-folder" placeholder="INBOX" spellcheck="false" />
+            </label>
+            <label class="field">
+              <span>发件人过滤</span>
+              <input
+                type="text"
+                id="em-sender"
+                placeholder="scholaralerts@google.com"
+                spellcheck="false"
+              />
+            </label>
+            <label class="field-check">
+              <input type="checkbox" id="em-ssl" checked /> SSL
+            </label>
+            <div class="settings-actions">
+              <button type="button" class="primary" id="btn-em-save">保存</button>
+              <button type="button" id="btn-em-test">测试 IMAP</button>
+            </div>
+            <div id="em-settings-msg" class="settings-msg"></div>
+          </div>
+          <div class="tip-box">
+            Gmail：Google 账号 → 安全性 → 开启两步验证 → 应用专用密码 → 选择「邮件」生成 16
+            位密码。普通登录密码通常无法用于 IMAP。
+          </div>
+        </section>
 
-      <section class="settings-card">
-        <h2>路径</h2>
-        <p id="path-info">加载中…</p>
-      </section>
+        <section class="settings-card">
+          <h2>翻译</h2>
+          <p>
+            目标语言固定 <strong>zh-CN</strong>。在阅读页使用：
+          </p>
+          <ul>
+            <li><strong>框选翻译</strong>：拖选区域 → 左右对照原文 / 译文</li>
+            <li><strong>全文翻译</strong>：后台任务生成 <code>*.zh-CN.pdf</code>（reflow）</li>
+            <li><strong>对照译稿</strong>：原文与译稿左右同步翻页</li>
+            <li>Shift +「全文翻译」可强制重译</li>
+          </ul>
+          <p style="margin-top: 0.45rem">
+            扫描件无文本层时区域翻译走视觉；全文任务需要可提取文本。
+          </p>
+        </section>
+
+        <section class="settings-card">
+          <h2>OCR · 表格提取</h2>
+          <p id="ocr-info">加载中…</p>
+          <ul>
+            <li>默认：img2table + Tesseract → 失败回退 RapidOCR</li>
+            <li>可选：提取时勾选「AI 视觉增强」</li>
+            <li>macOS 安装：<code>brew install tesseract tesseract-lang</code></li>
+          </ul>
+        </section>
+
+        <section class="settings-card">
+          <h2>路径</h2>
+          <div class="path-block" id="path-info">
+            <div class="path-label">加载中…</div>
+          </div>
+          <div class="tip-box">
+            自定义根目录：环境变量 <code>LITERATURE_ROOT</code>，或编辑
+            <code>config.yaml</code> 的 <code>literature_root</code> /
+            <code>pdfs_subdir</code>。
+          </div>
+        </section>
+
+        <section class="settings-card">
+          <h2>快捷键</h2>
+          <table class="shortcut-table">
+            <thead>
+              <tr>
+                <th>场景</th>
+                <th>按键</th>
+                <th>作用</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>阅读</td>
+                <td><span class="kbd">←</span> <span class="kbd">→</span></td>
+                <td>上一页 / 下一页</td>
+              </tr>
+              <tr>
+                <td>阅读</td>
+                <td><span class="kbd">Esc</span></td>
+                <td>退出框选 / 对照 / 关闭译文面板</td>
+              </tr>
+              <tr>
+                <td>截取</td>
+                <td><span class="kbd">T</span> / <span class="kbd">Shift+T</span></td>
+                <td>下一 / 上一 Table 页</td>
+              </tr>
+              <tr>
+                <td>截取</td>
+                <td><span class="kbd">Tab</span></td>
+                <td>下一篇文献</td>
+              </tr>
+              <tr>
+                <td>校对</td>
+                <td><span class="kbd">Y</span> / <span class="kbd">N</span></td>
+                <td>通过 / 不通过</td>
+              </tr>
+              <tr>
+                <td>校对</td>
+                <td><span class="kbd">R</span></td>
+                <td>按当前策略重新提取</td>
+              </tr>
+              <tr>
+                <td>聊天</td>
+                <td><span class="kbd">Esc</span></td>
+                <td>关闭悬浮助手</td>
+              </tr>
+              <tr>
+                <td>聊天球</td>
+                <td>拖动</td>
+                <td>移动位置（记住到本机）</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="settings-card section-span">
+          <h2>关于</h2>
+          <p id="about-info">Literature 个人网页文献阅读器</p>
+          <ul>
+            <li>文库 · 阅读 · PDF 中译（左右对照）· 表格截取/校对 · 悬浮 AI · 今日待读</li>
+            <li>不绕过付费墙；不提交 PDF / API Key / 邮箱密码</li>
+            <li>
+              文档：仓库内 <a href="https://github.com/Yechuan480/literature-capture" target="_blank" rel="noopener">README</a>
+              · <code>USAGE.md</code>
+            </li>
+            <li>许可证：MIT · 本地科研工作流</li>
+          </ul>
+        </section>
+      </div>
     </div>
 
     <script src="/static/js/shell.js"></script>
@@ -209,6 +489,12 @@
         function msg(el, text, kind) {
           el.textContent = text || "";
           el.className = "settings-msg" + (kind ? " " + kind : "");
+        }
+        function setChip(id, text, kind) {
+          const el = $(id);
+          if (!el) return;
+          el.textContent = text;
+          el.className = "chip" + (kind ? " " + kind : "");
         }
         async function api(path, options) {
           const res = await fetch(path, options);
@@ -222,13 +508,57 @@
           }
           return res.json();
         }
+        function statusCell(k, v, kind) {
+          return `<div class="status-item"><div class="k">${k}</div><div class="v${
+            kind ? " " + kind : ""
+          }">${v}</div></div>`;
+        }
         async function load() {
           const cfg = await api("/api/config");
+          let health = {};
+          try {
+            health = await api("/api/health");
+          } catch (_) {}
+
+          const aiReady = !!(cfg.ai_enabled || cfg.ai?.ready);
+          const ocr = cfg.ocr || health.ocr || {};
+          const si = cfg.si || {};
+          const feats = cfg.features || {};
+
           $("path-info").innerHTML = `
-            文献根目录：<code>${cfg.literature_root || "—"}</code><br/>
-            PDF 目录：<code>${cfg.pdfs_root || "—"}</code><br/>
-            截取目录：<code>${cfg.captures_root || "—"}</code>
+            <div class="path-label">文献根目录</div>
+            <code>${cfg.literature_root || "—"}</code>
+            <div class="path-label">PDF 目录</div>
+            <code>${cfg.pdfs_root || "—"}</code>
+            <div class="path-label">截取目录</div>
+            <code>${cfg.captures_root || "—"}</code>
           `;
+
+          const ocrEngine = ocr.engine || ocr.preferred || "auto";
+          const tess = ocr.tesseract_available ?? ocr.tesseract;
+          const rapid = ocr.rapidocr_available ?? ocr.rapidocr;
+          $("ocr-info").innerHTML = `
+            引擎配置：<code>${ocrEngine}</code><br/>
+            Tesseract：${tess === false ? "未检测到" : tess === true ? "可用" : "—"} ·
+            RapidOCR：${rapid === false ? "未装" : rapid === true ? "可用" : "—"}
+          `;
+
+          const ver = health.version || "—";
+          $("about-info").textContent = `Literature 个人网页文献阅读器 · 版本见后端 FastAPI`;
+          setChip("chip-app", health.status === "ok" ? "运行中" : "—", health.status === "ok" ? "ok" : "");
+
+          $("status-grid").innerHTML = [
+            statusCell("服务", health.status === "ok" ? "正常" : "未知", health.status === "ok" ? "ok" : "warn"),
+            statusCell("AI", aiReady ? "已就绪" : "未配置", aiReady ? "ok" : "warn"),
+            statusCell("OCR 引擎", String(ocrEngine)),
+            statusCell("Tesseract", tess === true ? "可用" : tess === false ? "缺失" : "—", tess === true ? "ok" : tess === false ? "warn" : ""),
+            statusCell("SI 自动", si.enabled === false ? "关闭" : si.auto_on_open ? "开篇拉取" : "手动", si.enabled === false ? "warn" : "ok"),
+            statusCell("文库", feats.library !== false ? "开" : "关", "ok"),
+            statusCell("翻译", feats.translate !== false ? "开" : "关", "ok"),
+            statusCell("今日待读", feats.scholar !== false ? "开" : "关", "ok"),
+            statusCell("聊天", feats.chat !== false ? "开" : "关", "ok"),
+          ].join("");
+
           const ai = await api("/api/settings/ai");
           $("ai-enabled").checked = !!ai.enabled;
           $("ai-base-url").value = ai.base_url || "";
@@ -236,6 +566,8 @@
           $("ai-api-key").placeholder = ai.has_key || ai.api_key_set
             ? "已保存 Key（留空保持不变）"
             : "sk-…";
+          setChip("chip-ai", aiReady || ai.enabled ? (aiReady ? "就绪" : "已启用·待测") : "关闭", aiReady ? "ok" : "warn");
+
           const em = await api("/api/scholar/settings");
           $("em-enabled").checked = !!em.enabled;
           $("em-host").value = em.host || "imap.gmail.com";
@@ -247,6 +579,11 @@
           $("em-password").placeholder = em.password_set
             ? "已保存密码（留空保持不变）"
             : "应用专用密码";
+          setChip(
+            "chip-email",
+            em.enabled ? (em.password_set || em.user ? "已配置" : "已启用·未全填") : "关闭",
+            em.enabled && em.password_set ? "ok" : "warn"
+          );
         }
         $("ai-show-key").addEventListener("change", () => {
           $("ai-api-key").type = $("ai-show-key").checked ? "text" : "password";
@@ -275,6 +612,7 @@
             $("ai-clear-key").checked = false;
             msg(el, "已保存", "ok");
             await load();
+            if (window.ChatFloat) ChatFloat.refreshReady();
           } catch (e) {
             msg(el, e.message, "warn");
           }
@@ -287,6 +625,8 @@
             const t = r.test || r;
             const ok = !!(t.ok ?? r.ready);
             msg(el, t.message || (ok ? "连接成功" : "失败"), ok ? "ok" : "warn");
+            await load();
+            if (window.ChatFloat) ChatFloat.refreshReady();
           } catch (e) {
             msg(el, e.message, "warn");
           }

@@ -180,7 +180,7 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 220px 1fr 280px;
+  grid-template-columns: 168px 1fr 240px;
   overflow: hidden;
 }
 
@@ -193,33 +193,33 @@
 }
 
 .library-collections .panel-header {
-  padding: 0.65rem 0.75rem 0.4rem;
+  padding: 0.45rem 0.55rem 0.3rem;
 }
 
 .library-collections .panel-header h2 {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 0.8rem;
 }
 
 .col-list {
   list-style: none;
   margin: 0;
-  padding: 0.35rem;
+  padding: 0.25rem;
   overflow: auto;
   flex: 1;
   min-height: 0;
 }
 
 .col-list li {
-  border-radius: 8px;
-  padding: 0.4rem 0.55rem;
-  margin-bottom: 0.2rem;
+  border-radius: 6px;
+  padding: 0.28rem 0.4rem;
+  margin-bottom: 0.12rem;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   color: var(--muted);
   display: flex;
   justify-content: space-between;
-  gap: 0.35rem;
+  gap: 0.3rem;
   align-items: center;
   border: 1px solid transparent;
 }
@@ -237,16 +237,16 @@
 }
 
 .col-list .col-count {
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
 .col-actions {
-  padding: 0.45rem 0.55rem 0.65rem;
+  padding: 0.35rem 0.4rem 0.5rem;
   border-top: 1px solid var(--border);
   display: flex;
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
 
 .col-actions input {
@@ -256,13 +256,13 @@
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 6px;
-  padding: 0.3rem 0.45rem;
-  font-size: 0.75rem;
+  padding: 0.22rem 0.35rem;
+  font-size: 0.7rem;
 }
 
 .col-actions button {
-  padding: 0.3rem 0.5rem;
-  font-size: 0.72rem;
+  padding: 0.22rem 0.4rem;
+  font-size: 0.68rem;
 }
 
 .library-main {
@@ -277,8 +277,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem 0.55rem;
-  padding: 0.5rem 0.7rem;
+  gap: 0.3rem 0.4rem;
+  padding: 0.35rem 0.5rem;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   flex-shrink: 0;
@@ -286,17 +286,22 @@
 
 .library-toolbar input[type="search"] {
   flex: 1;
-  min-width: 10rem;
+  min-width: 8rem;
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
-  border-radius: 8px;
-  padding: 0.4rem 0.6rem;
-  font-size: 0.82rem;
+  border-radius: 6px;
+  padding: 0.28rem 0.45rem;
+  font-size: 0.76rem;
+}
+
+.library-toolbar button {
+  font-size: 0.72rem;
+  padding: 0.28rem 0.5rem;
 }
 
 .library-toolbar .hint {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   color: var(--muted);
 }
 
@@ -309,7 +314,8 @@
 .item-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
+  table-layout: fixed;
 }
 
 .item-table th {
@@ -317,19 +323,19 @@
   top: 0;
   background: var(--panel-2);
   text-align: left;
-  padding: 0.4rem 0.55rem;
+  padding: 0.28rem 0.4rem;
   border-bottom: 1px solid var(--border);
   color: var(--muted);
   font-weight: 600;
-  font-size: 0.7rem;
+  font-size: 0.64rem;
   z-index: 1;
 }
 
 .item-table td {
-  padding: 0.42rem 0.55rem;
-  border-bottom: 1px solid rgba(51, 65, 85, 0.55);
-  vertical-align: top;
-  max-width: 20rem;
+  padding: 0.28rem 0.4rem;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.45);
+  vertical-align: middle;
+  line-height: 1.3;
 }
 
 .item-table tr {
@@ -346,21 +352,27 @@
 
 .item-table .title-cell {
   font-weight: 550;
-  line-height: 1.35;
+  line-height: 1.3;
   word-break: break-word;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .item-table .file-cell {
   color: var(--muted);
   font-family: var(--mono);
-  font-size: 0.68rem;
-  word-break: break-all;
+  font-size: 0.62rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .item-table .status-pill {
   display: inline-block;
-  font-size: 0.65rem;
-  padding: 0.08rem 0.35rem;
+  font-size: 0.6rem;
+  padding: 0.04rem 0.28rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   color: var(--muted);
@@ -388,8 +400,10 @@
 
 .item-table .meta-cell {
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.64rem;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .library-detail {
@@ -402,55 +416,55 @@
 }
 
 .library-detail .panel-header {
-  padding: 0.65rem 0.75rem 0.4rem;
+  padding: 0.45rem 0.55rem 0.3rem;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
 .library-detail .panel-header h2 {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 0.8rem;
 }
 
 .detail-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 0.65rem 0.75rem;
+  padding: 0.5rem 0.55rem;
 }
 
 .detail-body .empty {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   text-align: center;
-  margin-top: 2rem;
+  margin-top: 1.5rem;
 }
 
 .detail-title {
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 650;
-  line-height: 1.35;
-  margin-bottom: 0.35rem;
+  line-height: 1.3;
+  margin-bottom: 0.25rem;
   word-break: break-word;
 }
 
 .detail-file {
   font-family: var(--mono);
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   color: var(--muted);
   word-break: break-all;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.55rem;
 }
 
 .detail-field {
-  margin-bottom: 0.65rem;
+  margin-bottom: 0.45rem;
 }
 
 .detail-field label {
   display: block;
-  font-size: 0.7rem;
+  font-size: 0.64rem;
   color: var(--muted);
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.18rem;
 }
 
 .detail-field select,
@@ -460,27 +474,27 @@
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
-  border-radius: 7px;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.78rem;
+  border-radius: 6px;
+  padding: 0.28rem 0.4rem;
+  font-size: 0.74rem;
 }
 
 .detail-field textarea {
-  min-height: 4.5rem;
+  min-height: 3.4rem;
   resize: vertical;
 }
 
 .detail-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.75rem;
+  gap: 0.28rem;
+  margin-top: 0.55rem;
 }
 
 .detail-actions a,
 .detail-actions button {
-  font-size: 0.75rem;
-  padding: 0.35rem 0.6rem;
+  font-size: 0.7rem;
+  padding: 0.28rem 0.48rem;
   text-decoration: none;
 }
 
@@ -497,13 +511,13 @@
 .detail-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
-  margin: 0.5rem 0 0.75rem;
+  gap: 0.22rem;
+  margin: 0.35rem 0 0.55rem;
 }
 
 .detail-stats .badge {
-  font-size: 0.68rem;
-  padding: 0.12rem 0.4rem;
+  font-size: 0.62rem;
+  padding: 0.08rem 0.32rem;
   border: 1px solid var(--border);
   border-radius: 999px;
   color: var(--muted);
@@ -511,7 +525,7 @@
 
 @media (max-width: 1100px) {
   .library-layout {
-    grid-template-columns: 180px 1fr;
+    grid-template-columns: 148px 1fr;
   }
   .library-detail {
     display: none;

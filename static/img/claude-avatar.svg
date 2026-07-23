@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Claude">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D4A27F"/>
+      <stop offset="55%" stop-color="#C4784A"/>
+      <stop offset="100%" stop-color="#9A5B35"/>
+    </linearGradient>
+  </defs>
+  <circle cx="32" cy="32" r="32" fill="url(#g)"/>
+  <!-- Stylized asterisk / spark inspired by Claude brand mark -->
+  <g fill="#FAF6F1">
+    <path d="M32 12c1.1 0 2 .7 2.3 1.7l3.2 11.2 11.2 3.2c1 .3 1.7 1.2 1.7 2.3s-.7 2-1.7 2.3l-11.2 3.2-3.2 11.2c-.3 1-1.2 1.7-2.3 1.7s-2-.7-2.3-1.7l-3.2-11.2-11.2-3.2C13.7 33 13 32.1 13 31s.7-2 1.7-2.3l11.2-3.2 3.2-11.2C30 12.7 30.9 12 32 12z"/>
+  </g>
+  <g fill="#2D1F14" opacity="0.18">
+    <ellipse cx="32" cy="34" rx="14" ry="3.2"/>
+  </g>
+</svg>

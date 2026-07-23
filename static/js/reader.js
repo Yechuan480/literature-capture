@@ -1,14 +1,104 @@
 /**
- * Standalone PDF reader (library shell) + region/full translate.
+ * Standalone PDF reader (library shell) + bilingual region/full translate.
  */
 (function () {
+  const PDFJS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.min.mjs";
+  const WORKER_CDN =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.mjs";
+
   const state = {
     filename: null,
     item: null,
-    viewingTranslated: false,
+    compareMode: false,
     originalFilename: null,
+    translatedName: null,
     translateMode: false,
     fullJobPoll: null,
+  };
+
+  /** Lightweight secondary PDF.js instance for 译稿 pane */
+  const zhViewer = {
+    pdfjsLib: null,
+    pdfDoc: null,
+    pageNum: 1,
+    scale: 1.1,
+    rotation: 0,
+    rendering: false,
+    pending: null,
+    async ensureLib() {
+      if (this.pdfjsLib) return this.pdfjsLib;
+      this.pdfjsLib = await import(PDFJS_CDN);
+      this.pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_CDN;
+      return this.pdfjsLib;
+    },
+    canvas() {
+      return document.getElementById("pdf-canvas-zh");
+    },
+    async load(url) {
+      const lib = await this.ensureLib();
+      this.pdfDoc = await lib.getDocument({ url, withCredentials: false }).promise;
+      this.pageNum = 1;
+      this.rotation = 0;
+      await this.render();
+    },
+    async render() {
+      if (!this.pdfDoc) return;
+      if (this.rendering) {
+        this.pending = this.pageNum;
+        return;
+      }
+      this.rendering = true;
+      try {
+        const page = await this.pdfDoc.getPage(this.pageNum);
+        const canvas = this.canvas();
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d", { alpha: false });
+        const viewport = page.getViewport({
+          scale: this.scale,
+          rotation: this.rotation,
+        });
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.floor(viewport.width * dpr);
+        canvas.height = Math.floor(viewport.height * dpr);
+        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
+        const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null;
+        await page.render({ canvasContext: ctx, viewport, transform }).promise;
+      } finally {
+        this.rendering = false;
+        if (this.pending != null) {
+          const p = this.pending;
+          this.pending = null;
+          this.pageNum = p;
+          await this.render();
+        }
+      }
+    },
+    async goTo(n) {
+      if (!this.pdfDoc) return;
+      this.pageNum = Math.min(Math.max(1, n | 0), this.pdfDoc.numPages);
+      await this.render();
+    },
+    async setScale(s) {
+      this.scale = Math.min(3, Math.max(0.5, Number(s) || 1));
+      if (this.pdfDoc) await this.render();
+    },
+    async setRotation(deg) {
+      const d = (((Number(deg) || 0) % 360) + 360) % 360;
+      this.rotation = (Math.round(d / 90) * 90) % 360;
+      if (this.pdfDoc) await this.render();
+    },
+    clear() {
+      this.pdfDoc = null;
+      this.pageNum = 1;
+      const canvas = this.canvas();
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+    },
   };
 
   const $ = (id) => document.getElementById(id);
@@ -20,6 +110,13 @@
 
   function showLoading(on, text) {
     const mask = $("loading-mask");
+    if (!mask) return;
+    mask.classList.toggle("show", !!on);
+    mask.textContent = text || "加载中…";
+  }
+
+  function showZhLoading(on, text) {
+    const mask = $("loading-mask-zh");
     if (!mask) return;
     mask.classList.toggle("show", !!on);
     mask.textContent = text || "加载中…";
@@ -83,15 +180,12 @@
       ? `失败：${error}`
       : translation || "（空译文）";
     const srcEl = $("tr-src");
-    if (text) {
-      srcEl.hidden = false;
-      srcEl.textContent = text;
-    } else {
-      srcEl.hidden = true;
-      srcEl.textContent = "";
-    }
+    srcEl.textContent = text || (error ? "—" : "（无可提取原文，已走视觉翻译）");
     const bits = [];
-    if (source) bits.push(source === "vision" ? "视觉" : source === "text" ? "文本" : source);
+    if (source)
+      bits.push(
+        source === "vision" ? "视觉" : source === "text" ? "文本" : source
+      );
     if (model) bits.push(model);
     $("tr-meta").textContent = bits.join(" · ");
   }
@@ -99,6 +193,67 @@
   function hideTrPanel() {
     const panel = $("tr-panel");
     if (panel) panel.hidden = true;
+  }
+
+  async function setCompareMode(on, translatedName) {
+    state.compareMode = !!on;
+    document.body.classList.toggle("compare-on", state.compareMode);
+    const paneZh = $("pane-zh");
+    const openBtn = $("btn-tr-open");
+    if (!state.compareMode) {
+      if (paneZh) paneZh.hidden = true;
+      zhViewer.clear();
+      if (openBtn) {
+        openBtn.textContent = "对照译稿";
+        openBtn.dataset.mode = "zh";
+      }
+      return;
+    }
+    if (paneZh) paneZh.hidden = false;
+    if (openBtn) {
+      openBtn.hidden = false;
+      openBtn.textContent = "退出对照";
+      openBtn.dataset.mode = "exit";
+    }
+    const name =
+      translatedName ||
+      state.translatedName ||
+      (state.originalFilename || state.filename || "").replace(
+        /\.pdf$/i,
+        ""
+      ) + ".zh-CN.pdf";
+    state.translatedName = name;
+    showZhLoading(true, "加载译稿…");
+    try {
+      // Match main viewer scale roughly (slightly smaller for dual pane)
+      const mainScale = window.PdfViewer?.state?.scale || 1.25;
+      zhViewer.scale = Math.max(0.6, mainScale * 0.85);
+      zhViewer.rotation = window.PdfViewer?.state?.rotation || 0;
+      await zhViewer.load(`/api/translate/file/${encodeURIComponent(name)}`);
+      const page = window.PdfViewer?.state?.page || 1;
+      await zhViewer.goTo(page);
+      setStatus(
+        `左右对照 · 原文 ${window.PdfViewer?.state?.numPages || 0} 页 / 译稿 ${zhViewer.pdfDoc?.numPages || 0} 页`
+      );
+    } catch (e) {
+      state.compareMode = false;
+      document.body.classList.remove("compare-on");
+      if (paneZh) paneZh.hidden = true;
+      setStatus(e.message || "译稿加载失败");
+      throw e;
+    } finally {
+      showZhLoading(false);
+    }
+  }
+
+  async function syncZhToMain() {
+    if (!state.compareMode || !zhViewer.pdfDoc) return;
+    const page = window.PdfViewer?.state?.page || 1;
+    const scale = window.PdfViewer?.state?.scale || 1.25;
+    const rot = window.PdfViewer?.state?.rotation || 0;
+    zhViewer.scale = Math.max(0.6, scale * 0.85);
+    zhViewer.rotation = rot;
+    await zhViewer.goTo(page);
   }
 
   async function refreshTranslateStatus() {
@@ -110,8 +265,15 @@
       );
       const btn = $("btn-tr-open");
       if (btn) {
-        btn.hidden = !st.exists;
-        btn.dataset.name = st.translated_name || "";
+        btn.hidden = !st.exists && !state.compareMode;
+        if (st.translated_name) {
+          btn.dataset.name = st.translated_name;
+          state.translatedName = st.translated_name;
+        }
+        if (!state.compareMode) {
+          btn.textContent = "对照译稿";
+          btn.dataset.mode = "zh";
+        }
       }
       if (st.job && (st.job.status === "queued" || st.job.status === "running")) {
         setStatus(st.job.message || st.job.progress || "翻译中…");
@@ -136,7 +298,7 @@
       try {
         const job = await api(`/api/translate/jobs/${encodeURIComponent(jobId)}`);
         if (job.status === "done") {
-          setStatus(job.message || "全文翻译完成");
+          setStatus(job.message || "全文翻译完成 · 可点「对照译稿」");
           stopFullPoll();
           await refreshTranslateStatus();
           return;
@@ -157,8 +319,8 @@
   }
 
   async function runRegionTranslate() {
-    if (!state.filename || state.viewingTranslated) {
-      setStatus("请在原文上框选翻译");
+    if (!state.filename) {
+      setStatus("请先打开文献");
       return;
     }
     if (!window.RegionSelect) {
@@ -201,7 +363,7 @@
         body: JSON.stringify(body),
       });
       showTrPanel(res);
-      setStatus(res.ok ? "区域翻译完成" : res.error || "翻译失败");
+      setStatus(res.ok ? "区域对照完成" : res.error || "翻译失败");
     } catch (e) {
       showTrPanel({ error: e.message, translation: "", text: "" });
       setStatus(e.message || "翻译失败");
@@ -213,10 +375,6 @@
   async function startFullTranslate(force) {
     const base = state.originalFilename || state.filename;
     if (!base) return;
-    if (state.viewingTranslated) {
-      setStatus("请先回到原文再全文翻译");
-      return;
-    }
     showLoading(true, "提交全文翻译…");
     try {
       const job = await api("/api/translate/pdf", {
@@ -225,7 +383,8 @@
         body: JSON.stringify({ filename: base, force: !!force }),
       });
       if (job.id === "cached" || (job.status === "done" && job.result_name)) {
-        setStatus(job.message || "已存在译稿");
+        setStatus(job.message || "已存在译稿 · 可点「对照译稿」");
+        if (job.result_name) state.translatedName = job.result_name;
         await refreshTranslateStatus();
         showLoading(false);
         return;
@@ -239,50 +398,33 @@
     }
   }
 
-  async function openTranslated() {
+  async function enterCompare() {
     const base = state.originalFilename || state.filename;
     if (!base) return;
     const name =
       $("btn-tr-open")?.dataset.name ||
+      state.translatedName ||
       base.replace(/\.pdf$/i, "") + ".zh-CN.pdf";
-    state.viewingTranslated = true;
-    state.originalFilename = base;
     setTranslateUi(false);
     hideTrPanel();
-    $("reader-title").textContent = `${name}（译稿）`;
     try {
-      showLoading(true, "加载译稿…");
-      await PdfViewer.load(
-        `/api/translate/file/${encodeURIComponent(name)}`,
-        name
-      );
-      syncChrome();
-      setStatus(`译稿 · ${PdfViewer.state.numPages || 0} 页 · 点「打开原文」返回`);
-      const openBtn = $("btn-tr-open");
-      if (openBtn) {
-        openBtn.hidden = false;
-        openBtn.textContent = "打开原文";
-        openBtn.dataset.mode = "orig";
-      }
+      showLoading(true, "进入对照…");
+      await setCompareMode(true, name);
+      $("reader-title").textContent =
+        (state.item?.title || base) + " · 左右对照";
     } catch (e) {
-      state.viewingTranslated = false;
-      setStatus(e.message || "译稿加载失败");
       alert(e.message || "译稿加载失败");
     } finally {
       showLoading(false);
     }
   }
 
-  async function openOriginal() {
+  async function exitCompare() {
+    await setCompareMode(false);
     const base = state.originalFilename || state.filename;
-    if (!base) return;
-    state.viewingTranslated = false;
-    const openBtn = $("btn-tr-open");
-    if (openBtn) {
-      openBtn.textContent = "打开译稿";
-      openBtn.dataset.mode = "zh";
-    }
-    await openFile(base, { skipMeta: false });
+    $("reader-title").textContent = state.item?.title || base || "—";
+    setStatus("已退出对照");
+    await refreshTranslateStatus();
   }
 
   async function setStatusMark(status) {
@@ -307,7 +449,12 @@
     opts = opts || {};
     state.filename = filename;
     state.originalFilename = filename;
-    state.viewingTranslated = false;
+    state.compareMode = false;
+    state.translatedName = null;
+    document.body.classList.remove("compare-on");
+    const paneZh = $("pane-zh");
+    if (paneZh) paneZh.hidden = true;
+    zhViewer.clear();
     if (window.ChatFloat) ChatFloat.setPaperContext(filename);
     $("reader-empty").hidden = true;
     $("reader-toolbar").hidden = false;
@@ -318,8 +465,9 @@
     hideTrPanel();
     const openBtn = $("btn-tr-open");
     if (openBtn) {
-      openBtn.textContent = "打开译稿";
+      openBtn.textContent = "对照译稿";
       openBtn.dataset.mode = "zh";
+      openBtn.hidden = true;
     }
 
     try {
@@ -358,32 +506,39 @@
     $("btn-prev").addEventListener("click", async () => {
       await PdfViewer.prev();
       syncChrome();
+      await syncZhToMain();
     });
     $("btn-next").addEventListener("click", async () => {
       await PdfViewer.next();
       syncChrome();
+      await syncZhToMain();
     });
     $("page-input").addEventListener("change", async () => {
       const n = parseInt($("page-input").value, 10);
       if (!Number.isFinite(n)) return;
       await PdfViewer.goTo(n);
       syncChrome();
+      await syncZhToMain();
     });
     $("btn-zoom-in").addEventListener("click", async () => {
       await PdfViewer.zoomBy(0.1);
       syncChrome();
+      await syncZhToMain();
     });
     $("btn-zoom-out").addEventListener("click", async () => {
       await PdfViewer.zoomBy(-0.1);
       syncChrome();
+      await syncZhToMain();
     });
     $("btn-rotate-cw").addEventListener("click", async () => {
       await PdfViewer.rotateBy(90);
       syncChrome();
+      await syncZhToMain();
     });
     $("btn-rotate-ccw").addEventListener("click", async () => {
       await PdfViewer.rotateBy(-90);
       syncChrome();
+      await syncZhToMain();
     });
     $("btn-to-capture").addEventListener("click", () => {
       const fn = state.originalFilename || state.filename;
@@ -391,18 +546,16 @@
       const q = new URLSearchParams({ f: fn });
       window.location.href = `/capture?${q.toString()}`;
     });
-    $("btn-mark-reading").addEventListener("click", () => setStatusMark("reading"));
+    $("btn-mark-reading").addEventListener("click", () =>
+      setStatusMark("reading")
+    );
     $("btn-mark-done").addEventListener("click", () => setStatusMark("done"));
 
     $("btn-tr-region").addEventListener("click", () => {
-      if (state.viewingTranslated) {
-        setStatus("请在原文上使用框选翻译");
-        return;
-      }
       setTranslateUi(!state.translateMode);
       setStatus(
         state.translateMode
-          ? "框选模式：拖拽选区后点「译选区」"
+          ? "框选模式：拖拽选区后点「译选区」（左右对照）"
           : "已退出框选翻译"
       );
     });
@@ -416,8 +569,11 @@
       startFullTranslate(force);
     });
     $("btn-tr-open").addEventListener("click", () => {
-      if ($("btn-tr-open").dataset.mode === "orig") openOriginal();
-      else openTranslated();
+      if ($("btn-tr-open").dataset.mode === "exit" || state.compareMode) {
+        exitCompare();
+      } else {
+        enterCompare();
+      }
     });
     $("btn-tr-copy").addEventListener("click", async () => {
       const t = $("tr-body")?.textContent || "";
@@ -435,6 +591,7 @@
       if (state.translateMode && window.RegionSelect) {
         RegionSelect.setActive(true);
       }
+      if (state.compareMode) syncZhToMain();
     });
 
     document.addEventListener("region:selected", () => {
@@ -450,9 +607,15 @@
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         $("btn-next").click();
-      } else if (e.key === "Escape" && state.translateMode) {
-        setTranslateUi(false);
-        hideTrPanel();
+      } else if (e.key === "Escape") {
+        if (state.translateMode) {
+          setTranslateUi(false);
+          hideTrPanel();
+        } else if (state.compareMode) {
+          exitCompare();
+        } else {
+          hideTrPanel();
+        }
       }
     });
   }

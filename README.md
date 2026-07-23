@@ -17,12 +17,12 @@
 |------|------|
 | **文库** | `/` 集合 + 文献列表 + 阅读状态 / 标签 / 笔记（`data/library.json`） |
 | **阅读** | `/read?f=` PDF.js 翻页缩放旋转；可标在读/已读，跳转截取 |
-| **PDF 翻译** | 框选区域 → 文本/视觉机译 zh-CN；全文任务 → `*.zh-CN.pdf`（reflow） |
+| **PDF 翻译** | 框选/全文 → zh-CN；**左右对照**（区域双栏文本 · 全文双 PDF 同步翻页） |
 | **表格截取** | `/capture` 框选 PNG → 批量提取 CSV/Excel；SI 开放附件 |
 | **表格校对** | `/review` PNG 与表对比，通过/不通过，多策略重提 |
 | **设置** | `/settings` AI Key + IMAP 学术邮件（`data/*_settings.json`） |
 | **今日待读** | 文库「今日待读」：Scholar Alert → 多选保留 → OA PDF 入库（不绕过付费墙） |
-| **悬浮 AI 助手** | 右下角悬浮球；全站可用，结合当前 PDF 上下文；历史存 `data/chat/` |
+| **悬浮 AI 助手** | Claude 风格头像球（可拖动）；全站可用，结合当前 PDF 上下文；历史存 `data/chat/` |
 | 标题识别 | PDF 元数据 → 首页正文 → 文件名 |
 | **补充材料 SI** | DOI → Crossref / 出版商启发式 → `_captures/{slug}/si/`（不绕过付费墙） |
 | 主导航 | 文库 · 阅读 · 截取 · 校对 · 设置 |

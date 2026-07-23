@@ -32,13 +32,19 @@
       </div>
       <div class="tb-divider" aria-hidden="true"></div>
       <div class="tb-group" role="group" aria-label="翻译">
-        <button type="button" id="btn-tr-region" title="框选区域翻译为中文">框选翻译</button>
+        <button type="button" id="btn-tr-region" title="框选区域翻译为中文（左右对照）">
+          框选翻译
+        </button>
         <button type="button" id="btn-tr-run" title="翻译当前选区" class="primary" hidden>
           译选区
         </button>
         <button type="button" id="btn-tr-cancel" class="ghost" hidden>取消</button>
-        <button type="button" id="btn-tr-full" title="全文机译 → 新 PDF（zh-CN）">全文翻译</button>
-        <button type="button" id="btn-tr-open" title="打开已有中文译稿" hidden>打开译稿</button>
+        <button type="button" id="btn-tr-full" title="全文机译 → 新 PDF（zh-CN）">
+          全文翻译
+        </button>
+        <button type="button" id="btn-tr-open" title="左右对照原文与译稿" hidden>
+          对照译稿
+        </button>
       </div>
       <div class="tb-divider" aria-hidden="true"></div>
       <div class="tb-group">
@@ -55,13 +61,29 @@
     </div>
 
     <div class="reader-stage-wrap" id="reader-stage-wrap" hidden>
-      <div class="reader-stage canvas-stage" id="reader-stage">
-        <canvas id="pdf-canvas"></canvas>
-        <div id="highlight-layer" aria-hidden="true"></div>
-        <div id="select-overlay">
-          <div id="select-rect"></div>
+      <div class="reader-compare" id="reader-compare">
+        <div class="reader-pane pane-orig">
+          <div class="pane-label" id="pane-label-orig">原文</div>
+          <div class="pane-scroll">
+            <div class="reader-stage canvas-stage" id="reader-stage">
+              <canvas id="pdf-canvas"></canvas>
+              <div id="highlight-layer" aria-hidden="true"></div>
+              <div id="select-overlay">
+                <div id="select-rect"></div>
+              </div>
+              <div id="loading-mask" class="loading-mask">加载中…</div>
+            </div>
+          </div>
         </div>
-        <div id="loading-mask" class="loading-mask">加载中…</div>
+        <div class="reader-pane pane-zh" id="pane-zh" hidden>
+          <div class="pane-label">译稿 · zh-CN</div>
+          <div class="pane-scroll">
+            <div class="reader-stage canvas-stage" id="reader-stage-zh">
+              <canvas id="pdf-canvas-zh"></canvas>
+              <div id="loading-mask-zh" class="loading-mask">加载中…</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -69,15 +91,25 @@
 
     <aside class="tr-panel" id="tr-panel" hidden>
       <div class="tr-panel-head">
-        <strong>区域译文</strong>
+        <strong>区域对照</strong>
         <span class="tr-meta" id="tr-meta"></span>
         <div class="tr-actions">
-          <button type="button" id="btn-tr-copy" class="ghost">复制</button>
+          <button type="button" id="btn-tr-copy" class="ghost" title="复制译文">
+            复制译文
+          </button>
           <button type="button" id="btn-tr-close" class="ghost">关闭</button>
         </div>
       </div>
-      <div class="tr-src" id="tr-src" hidden></div>
-      <div class="tr-body" id="tr-body"></div>
+      <div class="tr-compare">
+        <div class="tr-col">
+          <div class="tr-col-label">原文</div>
+          <div class="tr-src" id="tr-src"></div>
+        </div>
+        <div class="tr-col">
+          <div class="tr-col-label">译文 · zh-CN</div>
+          <div class="tr-body" id="tr-body"></div>
+        </div>
+      </div>
     </aside>
 
     <script src="/static/js/shell.js"></script>
