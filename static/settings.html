@@ -381,19 +381,86 @@
         </section>
 
         <section class="settings-card">
-          <h2>翻译</h2>
+          <h2>
+            翻译
+            <span class="chip" id="chip-tr">—</span>
+          </h2>
           <p>
-            目标语言固定 <strong>zh-CN</strong>。在阅读页使用：
+            目标语言固定 <strong>zh-CN</strong>。可选引擎：
+            <strong>AI</strong> / <strong>Google</strong>（免密钥）/
+            <strong>百度</strong>（开放平台 App ID + 密钥）/
+            <strong>CNKI</strong>（尽力；可能需 token）。
+            阅读页工具栏可临时切换；此处为默认引擎与密钥。
           </p>
+          <div class="settings-form">
+            <label class="field">
+              <span>默认引擎</span>
+              <select id="tr-provider">
+                <option value="ai">AI 翻译</option>
+                <option value="google">Google 翻译</option>
+                <option value="baidu">百度翻译</option>
+                <option value="cnki">CNKI 翻译</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>百度 App ID</span>
+              <input
+                type="text"
+                id="tr-baidu-app-id"
+                placeholder="百度翻译开放平台 APP ID"
+                spellcheck="false"
+                autocomplete="off"
+              />
+            </label>
+            <label class="field">
+              <span>百度密钥</span>
+              <input
+                type="password"
+                id="tr-baidu-secret"
+                placeholder="密钥（留空保持不变）"
+                spellcheck="false"
+                autocomplete="new-password"
+              />
+            </label>
+            <label class="field-check">
+              <input type="checkbox" id="tr-show-baidu" /> 显示百度密钥
+            </label>
+            <label class="field-check">
+              <input type="checkbox" id="tr-clear-baidu" /> 清除百度密钥
+            </label>
+            <label class="field">
+              <span>CNKI Token（可选）</span>
+              <input
+                type="password"
+                id="tr-cnki-token"
+                placeholder="可选 Bearer / token（留空保持）"
+                spellcheck="false"
+                autocomplete="new-password"
+              />
+            </label>
+            <label class="field-check">
+              <input type="checkbox" id="tr-show-cnki" /> 显示 CNKI Token
+            </label>
+            <label class="field-check">
+              <input type="checkbox" id="tr-clear-cnki" /> 清除 CNKI Token
+            </label>
+            <div class="settings-actions">
+              <button type="button" class="primary" id="btn-tr-save">保存</button>
+            </div>
+            <div id="tr-settings-msg" class="settings-msg"></div>
+          </div>
           <ul>
             <li><strong>框选翻译</strong>：拖选区域 → 左右对照原文 / 译文</li>
             <li><strong>全文翻译</strong>：后台任务生成 <code>*.zh-CN.pdf</code>（reflow）</li>
             <li><strong>对照译稿</strong>：原文与译稿左右同步翻页</li>
             <li>Shift +「全文翻译」可强制重译</li>
+            <li>扫描件无文本层时区域翻译可走 AI 视觉；全文任务需要可提取文本</li>
           </ul>
-          <p style="margin-top: 0.45rem">
-            扫描件无文本层时区域翻译走视觉；全文任务需要可提取文本。
-          </p>
+          <div class="tip-box">
+            百度：<a href="https://fanyi-api.baidu.com/" target="_blank" rel="noopener">翻译开放平台</a>
+            通用翻译 API。Google 为非官方 gtx 端点，可能限流。CNKI 官方接口常需账号权限，失败时请改用其他引擎。
+            密钥存 <code>data/translate_settings.json</code>，不入库。
+          </div>
         </section>
 
         <section class="settings-card">
@@ -593,6 +660,27 @@
             em.enabled ? (em.password_set || em.user ? "已配置" : "已启用·未全填") : "关闭",
             em.enabled && em.password_set ? "ok" : "warn"
           );
+
+          const tr = await api("/api/translate/settings");
+          const trSel = $("tr-provider");
+          if (tr.providers && tr.providers.length) {
+            trSel.innerHTML = tr.providers
+              .map((p) => `<option value="${p.id}">${p.label || p.id}</option>`)
+              .join("");
+          }
+          trSel.value = tr.provider || "ai";
+          $("tr-baidu-app-id").value = tr.baidu_app_id || "";
+          $("tr-baidu-secret").placeholder = tr.baidu_secret_set
+            ? "已保存密钥（留空保持不变）"
+            : "百度翻译密钥";
+          $("tr-cnki-token").placeholder = tr.cnki_token_set
+            ? "已保存 Token（留空保持不变）"
+            : "可选 CNKI Token";
+          const trLabel =
+            (tr.providers || []).find((p) => p.id === tr.provider)?.label ||
+            tr.provider ||
+            "ai";
+          setChip("chip-tr", trLabel, "ok");
         }
         $("ai-show-key").addEventListener("change", () => {
           $("ai-api-key").type = $("ai-show-key").checked ? "text" : "password";
@@ -676,6 +764,41 @@
             const r = await api("/api/scholar/settings/test", { method: "POST" });
             const t = r.test || r;
             msg(el, t.message || (t.ok ? "成功" : "失败"), t.ok ? "ok" : "warn");
+          } catch (e) {
+            msg(el, e.message, "warn");
+          }
+        });
+        $("tr-show-baidu").addEventListener("change", () => {
+          $("tr-baidu-secret").type = $("tr-show-baidu").checked ? "text" : "password";
+        });
+        $("tr-show-cnki").addEventListener("change", () => {
+          $("tr-cnki-token").type = $("tr-show-cnki").checked ? "text" : "password";
+        });
+        $("btn-tr-save").addEventListener("click", async () => {
+          const el = $("tr-settings-msg");
+          try {
+            msg(el, "保存中…");
+            const body = {
+              provider: $("tr-provider").value,
+              baidu_app_id: $("tr-baidu-app-id").value.trim(),
+              clear_baidu_secret: $("tr-clear-baidu").checked,
+              clear_cnki_token: $("tr-clear-cnki").checked,
+            };
+            const secret = $("tr-baidu-secret").value.trim();
+            if (secret) body.baidu_secret = secret;
+            const token = $("tr-cnki-token").value.trim();
+            if (token) body.cnki_token = token;
+            await api("/api/translate/settings", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+            $("tr-baidu-secret").value = "";
+            $("tr-cnki-token").value = "";
+            $("tr-clear-baidu").checked = false;
+            $("tr-clear-cnki").checked = false;
+            msg(el, "已保存", "ok");
+            await load();
           } catch (e) {
             msg(el, e.message, "warn");
           }

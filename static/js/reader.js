@@ -14,6 +14,8 @@
     translatedName: null,
     translateMode: false,
     fullJobPoll: null,
+    provider: "ai",
+    providers: [],
   };
 
   /** Lightweight secondary PDF.js instance for 译稿 pane */
@@ -172,7 +174,25 @@
     }
   }
 
-  function showTrPanel({ text, translation, source, model, error }) {
+  function providerLabel(id) {
+    const p = (state.providers || []).find((x) => x.id === id);
+    if (p && p.label) return p.label;
+    const map = {
+      ai: "AI 翻译",
+      google: "Google 翻译",
+      baidu: "百度翻译",
+      cnki: "CNKI 翻译",
+    };
+    return map[id] || id || "—";
+  }
+
+  function currentProvider() {
+    const sel = $("tr-provider");
+    const v = (sel && sel.value) || state.provider || "ai";
+    return String(v).toLowerCase();
+  }
+
+  function showTrPanel({ text, translation, source, model, error, provider }) {
     const panel = $("tr-panel");
     if (!panel) return;
     panel.hidden = false;
@@ -182,12 +202,35 @@
     const srcEl = $("tr-src");
     srcEl.textContent = text || (error ? "—" : "（无可提取原文，已走视觉翻译）");
     const bits = [];
+    if (provider) bits.push(providerLabel(provider));
     if (source)
       bits.push(
         source === "vision" ? "视觉" : source === "text" ? "文本" : source
       );
     if (model) bits.push(model);
     $("tr-meta").textContent = bits.join(" · ");
+  }
+
+  async function loadTranslateProviders() {
+    try {
+      const st = await api("/api/translate/settings");
+      state.provider = st.provider || "ai";
+      state.providers = st.providers || [];
+      const sel = $("tr-provider");
+      if (sel) {
+        if (state.providers.length) {
+          sel.innerHTML = state.providers
+            .map(
+              (p) =>
+                `<option value="${p.id}">${p.label || p.id}</option>`
+            )
+            .join("");
+        }
+        sel.value = state.provider;
+      }
+    } catch (_) {
+      /* optional */
+    }
   }
 
   function hideTrPanel() {
@@ -340,6 +383,10 @@
       return;
     }
 
+    if (window.RegionSelect?.syncOverlayToCanvas) {
+      RegionSelect.syncOverlayToCanvas();
+    }
+
     showLoading(true, "翻译选区…");
     setStatus("翻译选区…");
     try {
@@ -350,12 +397,15 @@
       } catch (_) {
         /* vision optional */
       }
+      const provider = currentProvider();
       const body = {
         filename: state.originalFilename || state.filename,
         page: PdfViewer.state.page || 1,
         rect: sel,
         canvas: { w: cssW, h: cssH },
         image_b64,
+        rotation: PdfViewer.state.rotation || 0,
+        provider,
       };
       const res = await api("/api/translate/region", {
         method: "POST",
@@ -363,9 +413,18 @@
         body: JSON.stringify(body),
       });
       showTrPanel(res);
-      setStatus(res.ok ? "区域对照完成" : res.error || "翻译失败");
+      setStatus(
+        res.ok
+          ? `区域对照完成 · ${providerLabel(res.provider || provider)}`
+          : res.error || "翻译失败"
+      );
     } catch (e) {
-      showTrPanel({ error: e.message, translation: "", text: "" });
+      showTrPanel({
+        error: e.message,
+        translation: "",
+        text: "",
+        provider: currentProvider(),
+      });
       setStatus(e.message || "翻译失败");
     } finally {
       showLoading(false);
@@ -375,12 +434,17 @@
   async function startFullTranslate(force) {
     const base = state.originalFilename || state.filename;
     if (!base) return;
+    const provider = currentProvider();
     showLoading(true, "提交全文翻译…");
     try {
       const job = await api("/api/translate/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: base, force: !!force }),
+        body: JSON.stringify({
+          filename: base,
+          force: !!force,
+          provider,
+        }),
       });
       if (job.id === "cached" || (job.status === "done" && job.result_name)) {
         setStatus(job.message || "已存在译稿 · 可点「对照译稿」");
@@ -555,7 +619,7 @@
       setTranslateUi(!state.translateMode);
       setStatus(
         state.translateMode
-          ? "框选模式：拖拽选区后点「译选区」（左右对照）"
+          ? `框选模式 · ${providerLabel(currentProvider())}：拖选后点「译选区」`
           : "已退出框选翻译"
       );
     });
@@ -563,6 +627,10 @@
     $("btn-tr-cancel").addEventListener("click", () => {
       setTranslateUi(false);
       setStatus("已取消框选");
+    });
+    $("tr-provider")?.addEventListener("change", () => {
+      state.provider = currentProvider();
+      setStatus(`翻译引擎：${providerLabel(state.provider)}`);
     });
     $("btn-tr-full").addEventListener("click", () => {
       const force = !!(window.event && window.event.shiftKey);
@@ -588,6 +656,9 @@
 
     document.addEventListener("pdf:rendered", () => {
       syncChrome();
+      if (window.RegionSelect?.syncOverlayToCanvas) {
+        RegionSelect.syncOverlayToCanvas();
+      }
       if (state.translateMode && window.RegionSelect) {
         RegionSelect.setActive(true);
       }
@@ -624,6 +695,7 @@
     if (window.ShellNav) ShellNav.mount({ active: "reader" });
     if (window.RegionSelect) RegionSelect.bind();
     bind();
+    await loadTranslateProviders();
     const params = new URLSearchParams(window.location.search);
     const f = params.get("f") || params.get("filename");
     if (f) {

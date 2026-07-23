@@ -25,10 +25,41 @@
     return document.querySelector(".canvas-stage");
   }
 
+  /** Size overlay to the PDF canvas CSS box so selection == crop coords. */
+  function syncOverlayToCanvas() {
+    const ov = overlay();
+    const canvas =
+      (global.PdfViewer && global.PdfViewer.getCanvas && global.PdfViewer.getCanvas()) ||
+      document.getElementById("pdf-canvas");
+    if (!ov || !canvas) return;
+    const cssW =
+      canvas.clientWidth ||
+      parseFloat(canvas.style.width) ||
+      0;
+    const cssH =
+      canvas.clientHeight ||
+      parseFloat(canvas.style.height) ||
+      0;
+    if (cssW > 0 && cssH > 0) {
+      ov.style.width = `${Math.floor(cssW)}px`;
+      ov.style.height = `${Math.floor(cssH)}px`;
+      ov.style.left = "0";
+      ov.style.top = "0";
+      ov.style.right = "auto";
+      ov.style.bottom = "auto";
+    }
+    const layer = document.getElementById("highlight-layer");
+    if (layer && cssW > 0 && cssH > 0) {
+      layer.style.width = `${Math.floor(cssW)}px`;
+      layer.style.height = `${Math.floor(cssH)}px`;
+    }
+  }
+
   function setActive(on) {
     active = !!on;
     const ov = overlay();
     if (!ov) return;
+    if (active) syncOverlayToCanvas();
     ov.classList.toggle("active", active);
     if (!active) {
       dragging = false;
@@ -247,6 +278,12 @@
     ov.addEventListener("pointermove", onPointerMove);
     ov.addEventListener("pointerup", onPointerUp);
     ov.addEventListener("pointercancel", onPointerUp);
+    document.addEventListener("pdf:rendered", () => {
+      syncOverlayToCanvas();
+    });
+    window.addEventListener("resize", () => {
+      if (active) syncOverlayToCanvas();
+    });
   }
 
   function cancel() {
@@ -265,5 +302,6 @@
     cancel,
     getSelectionCss,
     setSelectionCss,
+    syncOverlayToCanvas,
   };
 })(window);

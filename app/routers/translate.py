@@ -1,4 +1,4 @@
-"""PDF translation API: region + full document."""
+"""PDF translation API: region + full document + provider settings."""
 
 from __future__ import annotations
 
@@ -14,6 +14,10 @@ from app.services.translate.full_pdf import (
     translated_path,
 )
 from app.services.translate.region import translate_region
+from app.services.translate.settings import (
+    public_translate_status,
+    save_translate_settings,
+)
 
 router = APIRouter(prefix="/api/translate", tags=["translate"])
 
@@ -24,11 +28,48 @@ class RegionRequest(BaseModel):
     rect: dict[str, float]  # x,y,w,h in CSS px relative to canvas
     canvas: dict[str, float]  # w,h of rendered page CSS
     image_b64: str | None = None  # optional PNG for vision fallback
+    rotation: int = 0  # page rotation shown in viewer: 0|90|180|270
+    provider: str | None = None  # ai|google|baidu|cnki
+    prefer_vision: bool = False  # AI only: translate crop image first
 
 
 class FullRequest(BaseModel):
     filename: str
     force: bool = False
+    provider: str | None = None
+
+
+class TranslateSettingsUpdate(BaseModel):
+    provider: str | None = None
+    baidu_app_id: str | None = None
+    baidu_secret: str | None = Field(
+        default=None,
+        description="留空表示保持；clear_baidu_secret=true 则清空",
+    )
+    clear_baidu_secret: bool = False
+    cnki_token: str | None = Field(
+        default=None,
+        description="可选；留空保持；clear_cnki_token=true 则清空",
+    )
+    clear_cnki_token: bool = False
+
+
+@router.get("/settings")
+def get_translate_settings():
+    return public_translate_status()
+
+
+@router.put("/settings")
+def put_translate_settings(body: TranslateSettingsUpdate):
+    save_translate_settings(
+        provider=body.provider,
+        baidu_app_id=body.baidu_app_id,
+        baidu_secret=body.baidu_secret,
+        clear_baidu_secret=body.clear_baidu_secret,
+        cnki_token=body.cnki_token,
+        clear_cnki_token=body.clear_cnki_token,
+    )
+    return public_translate_status()
 
 
 @router.post("/region")
@@ -43,6 +84,9 @@ def post_region(body: RegionRequest):
         rect=body.rect,
         canvas=body.canvas,
         image_b64=body.image_b64,
+        rotation=int(body.rotation or 0),
+        provider=body.provider,
+        prefer_vision=bool(body.prefer_vision),
     )
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=result.get("error") or "翻译失败")
@@ -52,7 +96,9 @@ def post_region(body: RegionRequest):
 @router.post("/pdf")
 def post_full_pdf(body: FullRequest):
     try:
-        job = enqueue_full_translate(body.filename, force=body.force)
+        job = enqueue_full_translate(
+            body.filename, force=body.force, provider=body.provider
+        )
     except HTTPException:
         raise
     except Exception as e:

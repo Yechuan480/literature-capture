@@ -218,6 +218,21 @@
       clearHighlights();
     }
 
+    // Keep overlay / highlight layer exactly the CSS box of the canvas
+    // so region selection coords match pdfplumber crop mapping.
+    const cssW = canvas.style.width || `${Math.floor(viewport.width)}px`;
+    const cssH = canvas.style.height || `${Math.floor(viewport.height)}px`;
+    const layer = getHighlightLayer();
+    if (layer) {
+      layer.style.width = cssW;
+      layer.style.height = cssH;
+    }
+    const ov = document.getElementById("select-overlay");
+    if (ov) {
+      ov.style.width = cssW;
+      ov.style.height = cssH;
+    }
+
     rendering = false;
     if (pendingPage !== null) {
       const p = pendingPage;
@@ -232,6 +247,10 @@
           numPages: state.numPages,
           scale,
           rotation,
+          canvasCss: {
+            w: Math.floor(viewport.width),
+            h: Math.floor(viewport.height),
+          },
         },
       })
     );

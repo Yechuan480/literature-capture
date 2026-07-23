@@ -253,9 +253,42 @@ body.reader-page:not(.compare-on) .pane-label {
   border-color: var(--accent);
 }
 
+.reader-toolbar .tr-provider-label {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+
+.reader-toolbar #tr-provider {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.72rem;
+  max-width: 7.5rem;
+  height: 1.7rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Sized by JS to match canvas CSS box (not full stage stretch) */
 .reader-stage #select-overlay {
   position: absolute;
-  inset: 0;
+  left: 0;
+  top: 0;
+  right: auto;
+  bottom: auto;
   cursor: crosshair;
   display: none;
   z-index: 3;

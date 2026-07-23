@@ -10,7 +10,7 @@ from app.config import get_settings
 from app.paths import safe_pdf_path, utc_now_iso
 from app.services import library_store as lib
 from app.services.translate import jobs as tr_jobs
-from app.services.translate.text import translate_text
+from app.services.translate.providers import translate_with_provider
 
 _FONT_CANDIDATES = [
     Path("/Library/Fonts/Arial Unicode.ttf"),
@@ -99,6 +99,7 @@ def write_zh_pdf(pages_zh: list[str], out_path: Path, *, title: str = "") -> Non
 def run_full_translate(job_id: str, payload: dict[str, Any]) -> None:
     filename = payload["filename"]
     force = bool(payload.get("force"))
+    provider = payload.get("provider")
     path = safe_pdf_path(filename)
     out = translated_path(filename)
 
@@ -124,6 +125,7 @@ def run_full_translate(job_id: str, payload: dict[str, Any]) -> None:
 
     translated: list[str] = []
     total = len(pages)
+    used_provider = provider or "ai"
     for i, page_text in enumerate(pages, start=1):
         tr_jobs.update_job(
             job_id,
@@ -133,9 +135,14 @@ def run_full_translate(job_id: str, payload: dict[str, Any]) -> None:
         if not (page_text or "").strip():
             translated.append("")
             continue
-        res = translate_text(page_text, context=f"{filename} p.{i}/{total}")
+        res = translate_with_provider(
+            page_text,
+            provider=provider,
+            context=f"{filename} p.{i}/{total}",
+        )
         if not res.get("ok"):
             raise RuntimeError(res.get("error") or f"第 {i} 页翻译失败")
+        used_provider = res.get("provider") or used_provider
         translated.append(res.get("translation") or "")
 
     tr_jobs.update_job(job_id, progress="write", message="写入译稿 PDF…")
@@ -157,13 +164,19 @@ def run_full_translate(job_id: str, payload: dict[str, Any]) -> None:
         job_id,
         status="done",
         progress="done",
-        message="完成",
+        message=f"完成（{used_provider}）",
         result_path=str(out),
         result_name=out.name,
+        provider=used_provider,
     )
 
 
-def enqueue_full_translate(filename: str, *, force: bool = False) -> dict[str, Any]:
+def enqueue_full_translate(
+    filename: str,
+    *,
+    force: bool = False,
+    provider: str | None = None,
+) -> dict[str, Any]:
     safe_pdf_path(filename)  # validate
     key = f"pdf:{filename}"
     if not force:
@@ -186,5 +199,5 @@ def enqueue_full_translate(filename: str, *, force: bool = False) -> dict[str, A
     return tr_jobs.start_job(
         key,
         run_full_translate,
-        {"filename": filename, "force": force},
+        {"filename": filename, "force": force, "provider": provider},
     )
