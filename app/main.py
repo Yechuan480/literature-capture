@@ -14,7 +14,6 @@ from app.models.schemas import HealthResponse
 from app.routers import capture, detect, papers, review, settings as settings_router, si
 from app.services.ai_settings import ai_ready, public_ai_status
 from app.services.extract_table import ocr_status
-from app.services.paddle_runtime import paddle_status
 
 settings = get_settings()
 settings.ensure_dirs()
@@ -64,7 +63,6 @@ def health():
 def public_config():
     ai = public_ai_status()
     ocr = ocr_status(settings)
-    pst = paddle_status(settings)
     return {
         "literature_root": str(settings.literature_root),
         "pdfs_root": str(settings.pdfs_root),
@@ -72,7 +70,6 @@ def public_config():
         "ocr": ocr,
         "ai_enabled": bool(ai.get("ready")),
         "ai": ai,
-        "paddle": pst,
         "si": {
             "enabled": bool(settings.si_enabled),
             "auto_on_open": bool(settings.si_auto_on_open),

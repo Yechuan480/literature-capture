@@ -19,6 +19,11 @@ class PaperItem(BaseModel):
     doi: str | None = None
     si_status: str | None = None
     si_file_count: int = 0
+    # Review / extract summary for sidebar filters
+    review_passed: int = 0
+    review_failed: int = 0
+    review_pending: int = 0
+    unextracted: int = 0
 
 
 class TitleResponse(BaseModel):

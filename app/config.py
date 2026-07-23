@@ -58,7 +58,7 @@ def get_settings() -> "Settings":
 
     paddle_enabled = _env_bool(
         "LITERATURE_PADDLE_ENABLED",
-        str(paddle.get("enabled", True)).lower() in ("1", "true", "yes", "on"),
+        str(paddle.get("enabled", False)).lower() in ("1", "true", "yes", "on"),
     )
 
     si_enabled = _env_bool(
@@ -131,7 +131,7 @@ class Settings:
         ai_api_key: str,
         host: str,
         port: int,
-        paddle_enabled: bool = True,
+        paddle_enabled: bool = False,
         paddle_device: str = "cpu",
         paddle_detect_model: str = "PicoDet_layout_1x_table",
         paddle_recognize_pipeline: str = "table_recognition_v2",

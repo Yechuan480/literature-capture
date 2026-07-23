@@ -14,9 +14,8 @@ opencv-contrib-python-headless>=4.8,<5
 rapidocr>=3.0.0
 onnxruntime>=1.17.0
 numpy>=1.26.0
-# PP-TableMagic / PaddleX (table detect + recognition); first run downloads models
-paddlepaddle>=3.0.0
-paddlex[ocr]>=3.0.0
+# Optional: table page detect only (not used for extraction). Install manually if needed:
+#   pip install paddlepaddle paddlex[ocr] pypdfium2
 pypdfium2>=4.30.0
 lxml>=5.0.0
 httpx>=0.27.0

@@ -26,27 +26,18 @@ from app.services.extract_table import (
 
 router = APIRouter(prefix="/api/review", tags=["review"])
 
+# Local engines only: AI vision / img2table(Tesseract) / RapidOCR.
 STRATEGIES = {
-    "auto": {"label": "自动（当前默认引擎）", "force_engine": None, "use_ai": False},
-    "paddlex": {
-        "label": "PP-TableMagic (PaddleX)",
-        "force_engine": "paddlex",
-        "use_ai": False,
-    },
+    "auto": {"label": "自动（img2table → RapidOCR）", "force_engine": None, "use_ai": False},
     "tesseract": {
-        "label": "Tesseract + img2table",
+        "label": "img2table + Tesseract",
         "force_engine": "img2table_tesseract",
         "use_ai": False,
     },
     "rapidocr": {"label": "RapidOCR 粗网格", "force_engine": "rapidocr", "use_ai": False},
     "ai": {"label": "仅 AI 视觉", "force_engine": "ai", "use_ai": True},
-    "paddlex_ai": {
-        "label": "PP-TableMagic + AI",
-        "force_engine": "paddlex",
-        "use_ai": True,
-    },
     "tesseract_ai": {
-        "label": "Tesseract + AI 增强",
+        "label": "img2table + AI 增强",
         "force_engine": "img2table_tesseract",
         "use_ai": True,
     },
@@ -95,17 +86,26 @@ def _item_detail(paper_dir, meta: dict, table_id: int) -> dict:
 
 
 @router.get("/queue")
-def review_queue():
-    return list_review_queue()
+def review_queue(
+    status: str | None = Query(
+        None,
+        description="todo|pending|failed|passed|all",
+    ),
+):
+    return list_review_queue(status=status)
 
 
 @router.get("/next")
-def review_next(after_slug: str | None = None, after_table_id: int | None = None):
+def review_next(
+    after_slug: str | None = None,
+    after_table_id: int | None = None,
+    status: str | None = Query(None, description="todo|pending|failed|passed|all"),
+):
     """Return next queue item (failed first, then pending). Optionally skip current."""
-    data = list_review_queue()
+    data = list_review_queue(status=status)
     queue = data["queue"]
     if not queue:
-        return {"item": None, "stats": data["stats"], "remaining": 0}
+        return {"item": None, "stats": data["stats"], "remaining": 0, "filter": data.get("filter")}
 
     start = 0
     if after_slug and after_table_id is not None:
@@ -127,6 +127,7 @@ def review_next(after_slug: str | None = None, after_table_id: int | None = None
         "stats": data["stats"],
         "remaining": len(queue),
         "index": start if start < len(queue) else 0,
+        "filter": data.get("filter"),
     }
 
 

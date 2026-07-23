@@ -101,6 +101,10 @@ def capture_stats_by_source_pdf(settings: Settings | None = None) -> dict[str, d
         count = png_n if png_n else int(meta.get("table_counter") or 0)
         caps = list_captures(child, meta) if png_n else []
         pending = sum(1 for c in caps if not c.get("extracted"))
+        review_passed = sum(1 for c in caps if c.get("review_status") == "passed")
+        review_failed = sum(1 for c in caps if c.get("review_status") == "failed")
+        review_pending = sum(1 for c in caps if c.get("review_status") == "pending")
+        unextracted = sum(1 for c in caps if not c.get("extracted"))
         prev = out.get(src)
         si = meta.get("si") if isinstance(meta.get("si"), dict) else {}
         si_status = str(si.get("status") or "idle")
@@ -115,6 +119,10 @@ def capture_stats_by_source_pdf(settings: Settings | None = None) -> dict[str, d
                 "doi": meta.get("doi") or None,
                 "si_status": si_status,
                 "si_file_count": len(si_files),
+                "review_passed": review_passed,
+                "review_failed": review_failed,
+                "review_pending": review_pending,
+                "unextracted": unextracted,
             }
     return out
 
@@ -223,6 +231,10 @@ def list_pdfs(settings: Settings | None = None) -> list[dict[str, Any]]:
                     "doi": st.get("doi") or None,
                     "si_status": st.get("si_status") or None,
                     "si_file_count": int(st.get("si_file_count") or 0),
+                    "review_passed": int(st.get("review_passed") or 0),
+                    "review_failed": int(st.get("review_failed") or 0),
+                    "review_pending": int(st.get("review_pending") or 0),
+                    "unextracted": int(st.get("unextracted") or 0),
                 }
             )
 
@@ -647,20 +659,39 @@ def paper_review_summary(captures: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def list_review_queue(settings: Settings | None = None) -> dict[str, Any]:
+def list_review_queue(
+    settings: Settings | None = None,
+    *,
+    status: str | None = None,
+) -> dict[str, Any]:
     """
-    Queue of captures needing human review.
-    Skip papers where every capture is passed (all_passed).
-    Within remaining papers, only include non-passed tables (pending + failed).
+    Queue of captures for human review.
+
+    status filter:
+      None / "todo"  → pending + failed (default queue; skip all-passed papers)
+      "pending"      → only pending
+      "failed"       → only failed
+      "passed"       → only passed
+      "all"          → pending + failed + passed
     """
     settings = settings or get_settings()
     root = settings.captures_root
     papers_out: list[dict[str, Any]] = []
     queue: list[dict[str, Any]] = []
-    stats = {"papers": 0, "papers_done": 0, "tables": 0, "passed": 0, "failed": 0, "pending": 0}
+    stats = {
+        "papers": 0,
+        "papers_done": 0,
+        "tables": 0,
+        "passed": 0,
+        "failed": 0,
+        "pending": 0,
+    }
+    want = (status or "todo").lower().strip()
+    if want in ("", "default", "open", "remaining"):
+        want = "todo"
 
     if not root.is_dir():
-        return {"stats": stats, "papers": [], "queue": []}
+        return {"stats": stats, "papers": [], "queue": [], "filter": want}
 
     for child in sorted(root.iterdir(), key=lambda p: p.name.lower()):
         if not child.is_dir():
@@ -668,14 +699,14 @@ def list_review_queue(settings: Settings | None = None) -> dict[str, Any]:
         meta = load_meta(child)
         if not meta:
             continue
-        # skip pure session placeholders with no tables / no_tables mark
-        if meta.get("no_tables") and not list(child.glob(f"{meta.get('paper_slug', child.name)}-table*.png")):
+        if meta.get("no_tables") and not list(
+            child.glob(f"{meta.get('paper_slug', child.name)}-table*.png")
+        ):
             continue
         caps = list_captures(child, meta)
         if not caps:
             continue
         extracted_caps = [c for c in caps if c.get("extracted")]
-        # Papers with only unextracted PNGs are not in the review workflow yet
         if not extracted_caps:
             continue
         summary = {
@@ -699,17 +730,6 @@ def list_review_queue(settings: Settings | None = None) -> dict[str, Any]:
         stats["pending"] += summary["pending"]
         if summary["all_passed"]:
             stats["papers_done"] += 1
-            papers_out.append(
-                {
-                    "paper_slug": meta.get("paper_slug") or child.name,
-                    "title": meta.get("title") or "",
-                    "source_pdf": meta.get("source_pdf") or "",
-                    "folder": str(child),
-                    **summary,
-                    "hidden": True,
-                }
-            )
-            continue
 
         paper_info = {
             "paper_slug": meta.get("paper_slug") or child.name,
@@ -719,10 +739,29 @@ def list_review_queue(settings: Settings | None = None) -> dict[str, Any]:
             **summary,
             "hidden": False,
         }
+
+        if want == "todo":
+            if summary["all_passed"]:
+                paper_info["hidden"] = True
+                papers_out.append(paper_info)
+                continue
+        elif want == "passed":
+            if summary["passed"] == 0:
+                continue
+        elif want == "failed":
+            if summary["failed"] == 0:
+                continue
+        elif want == "pending":
+            if summary["pending"] == 0:
+                continue
+
         papers_out.append(paper_info)
 
         for c in extracted_caps:
-            if c.get("review_status") == "passed":
+            st = c.get("review_status") or "pending"
+            if want == "todo" and st == "passed":
+                continue
+            if want in ("pending", "failed", "passed") and st != want:
                 continue
             queue.append(
                 {
@@ -731,8 +770,7 @@ def list_review_queue(settings: Settings | None = None) -> dict[str, Any]:
                     "title": paper_info["title"],
                     "source_pdf": paper_info["source_pdf"],
                     "folder": paper_info["folder"],
-                    # Prefer failed first so user re-checks re-extracted ones, then pending
-                    "_sort": 0 if c.get("review_status") == "failed" else 1,
+                    "_sort": 0 if st == "failed" else (1 if st == "pending" else 2),
                 }
             )
 
@@ -746,7 +784,8 @@ def list_review_queue(settings: Settings | None = None) -> dict[str, Any]:
     for q in queue:
         q.pop("_sort", None)
 
-    return {"stats": stats, "papers": papers_out, "queue": queue}
+    return {"stats": stats, "papers": papers_out, "queue": queue, "filter": want}
+
 
 
 def load_capture_matrix(csv_path: Path, max_rows: int = 200) -> list[list[str]]:

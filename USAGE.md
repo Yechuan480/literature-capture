@@ -50,10 +50,11 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8765
 6. **批量提取**  
    - 可跨多篇连续标记：每确认截取一次，**全局待提取**计数累加（切换文献不会清零）  
    - 本篇或全部标完后，点工具栏或右侧 **提取表格 (N)** → 对**所有文献**的未提取截图依次识别  
-   - 默认优先 **PP-TableMagic**，失败回退 Tesseract / RapidOCR；可选「提取时使用 AI 视觉增强」  
+   - 默认 **img2table + Tesseract**，失败回退 RapidOCR；可选「提取时使用 AI 视觉增强」  
    - 输出：`_captures/{slug}/{slug}-tableN.csv|.xlsx`（PNG 已存在）  
    - 列表单项也可点 **提取** / **重新提取**（仅当前篇）  
    - 侧栏徽章 `count/pending` 表示该篇已标记数 / 仍待提取数
+   - 侧栏筛选芯片：**全部 / 未通过 / 待校对 / 已通过 / 未提取 / 待办**
 
 7. **无表格**  
    整篇没有可截表格时点 **无表格**，列表会标注并沉底。
@@ -65,6 +66,7 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8765
 
 | 键 | 作用 |
 |----|------|
+| `Tab` / `Shift+Tab` | 下一篇 / 上一篇文献（按当前筛选） |
 | `←` / `→` | 上一页 / 下一页 |
 | `T` / `Shift+T` | 下一 / 上一 Table 页 |
 | `R` / `Shift+R` | 顺时针 / 逆时针旋转 90° |
@@ -76,11 +78,11 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8765
 
 入口：主页「→ 进入表格校对」或直接访问 http://127.0.0.1:8765/review
 
-1. 左侧为待校对队列（**已通过的不会出现**；**尚未批量提取的截图也不会入队**）  
+1. 左侧为校对队列，可用芯片筛选：**待办 / 未通过 / 待校对 / 已通过 / 全部**  
 2. 中间左右对比：原图 PNG | 提取表（可下 CSV/Excel）  
-3. **通过**：该项移出队列；该篇全部通过后整篇不再进入队列  
+3. **通过**：该项移出默认待办队列；该篇全部通过后整篇不再进入待办  
 4. **不通过**：可选策略重提后再核对  
-   - 自动 / **PP-TableMagic** / Tesseract / RapidOCR / AI / 组合策略  
+   - AI 视觉 / 自动(img2table→RapidOCR) / Tesseract / RapidOCR / 组合策略  
 5. **跳过**：先处理其他项  
 
 ### 快捷键
@@ -89,6 +91,7 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8765
 |----|------|
 | `Y` / `1` | 通过 |
 | `N` / `2` | 不通过 |
+| `Tab` / `Shift+Tab` | 下一项 / 上一项 |
 | `S` | 跳过 |
 | `R` | 按当前策略重新提取 |
 
@@ -112,8 +115,8 @@ export LITERATURE_AI_ENABLED=true
 
 ## 常见问题
 
-**批量提取 / Paddle 不可用**  
-确认已 `pip install paddlepaddle 'paddlex[ocr]'`，`config.yaml` 中 `paddle.enabled: true`，内存充足。首次会下载模型，可设 `PADDLE_PDX_MODEL_SOURCE=BOS`。健康检查：`GET /api/health`。无 Paddle 时会回退 Tesseract / RapidOCR。
+**批量提取效果差 / 无 Tesseract**  
+安装 Tesseract：`brew install tesseract tesseract-lang`。默认 `ocr.engine: auto` 优先 img2table+Tesseract，失败回退 RapidOCR。也可用「AI 视觉增强」。健康检查：`GET /api/health`。
 
 **Table 扫描失败 / findPages is not a function**  
 强制刷新：`Cmd+Shift+R`（Windows：`Ctrl+Shift+R`）。

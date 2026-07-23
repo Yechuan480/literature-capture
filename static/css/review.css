@@ -79,6 +79,37 @@
   min-height: 0;
 }
 
+.review-sidebar .filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.45rem 0.55rem 0.35rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.review-sidebar .filter-chips .chip {
+  padding: 0.18rem 0.48rem;
+  font-size: 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.review-sidebar .filter-chips .chip:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--panel-2);
+}
+
+.review-sidebar .filter-chips .chip.active {
+  border-color: var(--accent);
+  color: #082f49;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  font-weight: 600;
+}
+
 .queue-list {
   list-style: none;
   margin: 0;
@@ -107,6 +138,10 @@
 
 .queue-list li.failed {
   border-color: rgba(248, 113, 113, 0.35);
+}
+
+.queue-list li.passed {
+  border-color: rgba(74, 222, 128, 0.3);
 }
 
 .queue-list .q-title {
@@ -142,6 +177,11 @@
 .queue-list .tag.pending {
   color: var(--warn);
   border-color: rgba(251, 191, 36, 0.4);
+}
+
+.queue-list .tag.passed {
+  color: var(--ok);
+  border-color: rgba(74, 222, 128, 0.45);
 }
 
 .review-main {

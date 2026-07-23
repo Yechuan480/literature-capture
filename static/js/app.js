@@ -5,6 +5,7 @@
   const state = {
     papers: [],
     filter: "",
+    reviewFilter: "all", // all|failed|pending|passed|unextracted|todo
     filename: null,
     title: "",
     titleSource: "",
@@ -310,17 +311,58 @@
     }
   }
 
-  function paperMatchesFilter(p, q) {
+  function paperMatchesText(p, q) {
     if (!q) return true;
     const hay = `${p.filename || ""} ${p.title || ""} ${p.paper_slug || ""}`.toLowerCase();
     return hay.includes(q);
   }
 
+  function paperMatchesReview(p, reviewFilter) {
+    const f = reviewFilter || "all";
+    if (f === "all") return true;
+    const failed = Number(p.review_failed) || 0;
+    const pending = Number(p.review_pending) || 0;
+    const passed = Number(p.review_passed) || 0;
+    const unextracted = Number(p.unextracted) || Number(p.pending_extract) || 0;
+    if (f === "failed") return failed > 0;
+    if (f === "pending") return pending > 0;
+    if (f === "passed") return passed > 0;
+    if (f === "unextracted") return unextracted > 0;
+    if (f === "todo") return failed > 0 || pending > 0;
+    return true;
+  }
+
   function filteredPapers() {
     const q = (state.filter || "").trim().toLowerCase();
-    // Server already sorts: unprocessed → no_tables → captured
-    if (!q) return state.papers;
-    return state.papers.filter((p) => paperMatchesFilter(p, q));
+    const rf = state.reviewFilter || "all";
+    return state.papers.filter(
+      (p) => paperMatchesText(p, q) && paperMatchesReview(p, rf)
+    );
+  }
+
+  function syncFilterChips() {
+    const wrap = $("paper-filter-chips");
+    if (!wrap) return;
+    wrap.querySelectorAll(".chip").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.filter === state.reviewFilter);
+    });
+  }
+
+  function openAdjacentPaper(delta) {
+    const items = filteredPapers();
+    if (!items.length) {
+      setStatus("当前筛选下没有文献", "warn");
+      return;
+    }
+    let idx = items.findIndex((p) => p.filename === state.filename);
+    if (idx < 0) idx = delta > 0 ? -1 : 0;
+    const next = items[(idx + delta + items.length) % items.length];
+    if (!next) return;
+    if (next.filename === state.filename && items.length === 1) {
+      setStatus("当前筛选仅 1 篇文献", "warn");
+      return;
+    }
+    openPaper(next.filename);
   }
 
   function renderPaperList() {
@@ -333,12 +375,13 @@
       countEl.textContent =
         items.length === total ? `共 ${total} 篇` : `${items.length} / ${total}`;
     }
+    syncFilterChips();
     if (!state.papers.length) {
       ul.innerHTML = `<li class="empty">未找到 PDF。请将文件放入文献目录下的 pdfs/ 文件夹。</li>`;
       return;
     }
     if (!items.length) {
-      ul.innerHTML = `<li class="empty">无匹配文献，试试其他关键词</li>`;
+      ul.innerHTML = `<li class="empty">无匹配文献，试试其他关键词或筛选</li>`;
       return;
     }
     for (const p of items) {
@@ -366,19 +409,30 @@
       } else {
         titleLine.style.display = "none";
       }
+      const rp = Number(p.review_passed) || 0;
+      const rf = Number(p.review_failed) || 0;
+      const rpend = Number(p.review_pending) || 0;
+      const revBits = [];
+      if (rp) revBits.push(`✓${rp}`);
+      if (rf) revBits.push(`✗${rf}`);
+      if (rpend) revBits.push(`…${rpend}`);
+      const revTxt = revBits.length ? ` · 校${revBits.join("")}` : "";
       li.querySelector(".meta").textContent = `${formatSize(p.size)} · ${
         p.mtime?.slice(0, 10) || ""
-      }`;
+      }${revTxt}`;
       const badge = li.querySelector(".paper-badge");
       const pending = Number(p.pending_extract) || 0;
       if (count > 0) {
         badge.classList.add("done");
+        if (rf > 0) badge.classList.add("review-failed");
+        else if (rpend > 0) badge.classList.add("review-pending");
+        else if (rp > 0 && rp >= count - pending) badge.classList.add("review-passed");
         if (pending > 0) {
           badge.classList.add("pending-extract");
-          badge.title = `已标记 ${count} 处 · ${pending} 待提取`;
+          badge.title = `已标记 ${count} 处 · ${pending} 待提取 · 通过${rp}/未过${rf}/待校${rpend}`;
           badge.innerHTML = `<span class="count">${count}</span><span class="pend">/${pending}</span>`;
         } else {
-          badge.title = `已标记 ${count} 处（均已提取）`;
+          badge.title = `已标记 ${count} 处 · 通过${rp}/未过${rf}/待校${rpend}`;
           badge.innerHTML = `<span class="check">✓</span><span class="count">${count}</span>`;
         }
       } else if (p.no_tables) {
@@ -873,10 +927,21 @@
   async function loadConfig() {
     state.config = await api("/api/config");
     const ocr = state.config.ocr || {};
-    const paddle = state.config.paddle || {};
+    const engines = Array.isArray(ocr.engines) ? ocr.engines : [];
     let badge = `OCR: ${ocr.engine || "?"}`;
-    if (paddle.import_ok || ocr.paddle_available) {
-      badge += paddle.paddle_detect || ocr.paddle_detect ? " · Paddle✓" : " · Paddle";
+    if (engines.length) {
+      const short = engines
+        .map((e) =>
+          e === "ai_vision"
+            ? "AI"
+            : e === "img2table_tesseract"
+              ? "img2table"
+              : e === "rapidocr"
+                ? "RapidOCR"
+                : e
+        )
+        .join("/");
+      badge += ` · ${short}`;
     }
     $("ocr-badge").textContent = badge;
     if (ocr.hint) setStatus(ocr.hint, "warn");
@@ -1596,6 +1661,13 @@
         }, 120);
       });
     }
+    $("paper-filter-chips")?.addEventListener("click", (e) => {
+      const btn = e.target.closest(".chip");
+      if (!btn || !btn.dataset.filter) return;
+      state.reviewFilter = btn.dataset.filter;
+      syncFilterChips();
+      renderPaperList();
+    });
 
     $("btn-prev").addEventListener("click", async () => {
       await PdfViewer.prev();
@@ -1662,11 +1734,15 @@
     });
 
     document.addEventListener("keydown", (e) => {
-      if (e.target && ["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
+      if (e.target && ["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName))
+        return;
       if (e.key === "Escape") {
         RegionSelect.cancel();
         RegionSelect.setActive(false);
         $("btn-select").classList.remove("active");
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        openAdjacentPaper(e.shiftKey ? -1 : 1);
       } else if (e.key === "ArrowLeft") {
         PdfViewer.prev().then(updatePageUi);
       } else if (e.key === "ArrowRight") {

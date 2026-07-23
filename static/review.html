@@ -12,7 +12,7 @@
       <div class="rh-left">
         <a class="brand" href="/">← 截取工具</a>
         <h1>表格校对</h1>
-        <p class="hint">对比截图与提取结果 · 通过后不再出现 · 不通过可换策略重提</p>
+        <p class="hint">对比截图与提取结果 · Y/1 通过 · N/2 不通过 · Tab 下一项 · Shift+Tab 上一项 · S 跳过 · R 重提</p>
       </div>
       <div class="rh-stats" id="stats-bar">
         <span class="stat"><b id="st-remaining">—</b> 待校对</span>
@@ -27,6 +27,13 @@
         <div class="panel-header">
           <h2>校对队列</h2>
           <p id="queue-hint" class="hint">加载中…</p>
+        </div>
+        <div class="filter-chips" id="queue-filter-chips" role="group" aria-label="队列状态筛选">
+          <button type="button" class="chip active" data-filter="todo" title="待校对 + 未通过">待办</button>
+          <button type="button" class="chip" data-filter="failed" title="仅未通过">未通过</button>
+          <button type="button" class="chip" data-filter="pending" title="仅待校对">待校对</button>
+          <button type="button" class="chip" data-filter="passed" title="仅已通过">已通过</button>
+          <button type="button" class="chip" data-filter="all" title="全部状态">全部</button>
         </div>
         <ul class="queue-list" id="queue-list"></ul>
       </aside>
@@ -86,11 +93,11 @@
               <label class="hint">不通过后的重提策略</label>
               <div class="strategy-row">
                 <select id="strategy-select">
-                  <option value="auto">自动（默认引擎）</option>
-                  <option value="tesseract">Tesseract + img2table</option>
+                  <option value="ai" selected>仅 AI 视觉</option>
+                  <option value="auto">自动（img2table → RapidOCR）</option>
+                  <option value="tesseract">img2table + Tesseract</option>
                   <option value="rapidocr">RapidOCR 粗网格</option>
-                  <option value="ai">仅 AI 视觉</option>
-                  <option value="tesseract_ai" selected>Tesseract + AI 增强</option>
+                  <option value="tesseract_ai">img2table + AI 增强</option>
                   <option value="rapidocr_ai">RapidOCR + AI 增强</option>
                 </select>
                 <button type="button" class="primary" id="btn-reextract">重新提取</button>

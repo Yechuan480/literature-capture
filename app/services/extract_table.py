@@ -43,45 +43,42 @@ def tesseract_available() -> bool:
 
 
 def resolve_engine(settings: Settings | None = None) -> str:
+    """Resolve local OCR engine. Supported: auto | img2table_tesseract | rapidocr | ai.
+
+    Paddle/PaddleX is no longer used for extraction (keeps local footprint small).
+    Legacy config value ``paddlex`` falls back to img2table → rapidocr.
+    """
     settings = settings or get_settings()
-    engine = (settings.ocr_engine or "auto").lower()
-    if engine == "auto":
-        # Prefer PP-TableMagic when configured + importable (load models lazily on extract)
-        if settings.paddle_enabled and paddlex_importable():
-            return "paddlex"
+    engine = (settings.ocr_engine or "auto").lower().strip()
+    if engine in ("auto", "paddlex", "paddle"):
         if tesseract_available():
             return "img2table_tesseract"
         return "rapidocr"
-    if engine == "paddlex":
-        if settings.paddle_enabled and paddlex_importable():
-            return "paddlex"
+    if engine in ("img2table", "tesseract", "img2table_tesseract"):
         return "img2table_tesseract" if tesseract_available() else "rapidocr"
-    return engine
+    if engine == "rapidocr":
+        return "rapidocr"
+    if engine == "ai":
+        return "ai"
+    # Unknown → safe local fallback
+    return "img2table_tesseract" if tesseract_available() else "rapidocr"
 
 
 def ocr_status(settings: Settings | None = None) -> dict[str, Any]:
     settings = settings or get_settings()
     engine = resolve_engine(settings)
-    pst = paddle_status(settings)
     hint = None
-    if engine in ("rapidocr",) and not tesseract_available() and not pst.get("paddle_recognize"):
+    if not tesseract_available():
         hint = (
-            "未检测到 tesseract / Paddle，将使用 RapidOCR 后备。"
-            "建议: brew install tesseract tesseract-lang；"
-            "或 pip install paddlepaddle 'paddlex[ocr]'"
+            "未检测到 tesseract，本地提取将使用 RapidOCR。"
+            "建议: brew install tesseract tesseract-lang"
         )
-    elif not tesseract_available() and not pst.get("paddle_recognize"):
-        hint = "未检测到 tesseract，将使用 RapidOCR 后备。建议: brew install tesseract tesseract-lang"
     return {
         "engine": engine,
         "configured": settings.ocr_engine,
         "tesseract_available": tesseract_available(),
         "lang": settings.ocr_lang,
-        "paddle_available": bool(pst.get("paddle_available")),
-        "paddle_detect": bool(pst.get("paddle_detect")),
-        "paddle_recognize": bool(pst.get("paddle_recognize")),
-        "paddle_error": pst.get("paddle_error"),
-        "paddle_configured": bool(settings.paddle_enabled),
+        "engines": ["ai_vision", "img2table_tesseract", "rapidocr"],
         "hint": hint,
     }
 

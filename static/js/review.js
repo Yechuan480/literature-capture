@@ -7,6 +7,7 @@
     queue: [],
     current: null,
     loading: false,
+    statusFilter: "todo", // todo|pending|failed|passed|all
   };
 
   const $ = (id) => document.getElementById(id);
@@ -64,21 +65,43 @@
     return "待校对";
   }
 
+  function filterLabel(f) {
+    const map = {
+      todo: "待办",
+      pending: "待校对",
+      failed: "未通过",
+      passed: "已通过",
+      all: "全部",
+    };
+    return map[f] || f;
+  }
+
+  function syncFilterChips() {
+    const wrap = $("queue-filter-chips");
+    if (!wrap) return;
+    wrap.querySelectorAll(".chip").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.filter === state.statusFilter);
+    });
+  }
+
   function renderQueue() {
     const ul = $("queue-list");
     ul.innerHTML = "";
     const q = state.queue || [];
+    const fl = filterLabel(state.statusFilter);
     $("queue-hint").textContent = q.length
-      ? `${q.length} 项待处理（已通过的不显示）`
-      : "队列为空";
+      ? `${q.length} 项 · 筛选「${fl}」`
+      : `队列为空（${fl}）`;
+    syncFilterChips();
     if (!q.length) {
-      ul.innerHTML = `<li class="empty">暂无待校对项</li>`;
+      ul.innerHTML = `<li class="empty">暂无匹配项</li>`;
       return;
     }
     for (const item of q) {
       const li = document.createElement("li");
       const st = item.review_status || "pending";
       if (st === "failed") li.classList.add("failed");
+      if (st === "passed") li.classList.add("passed");
       if (
         state.current &&
         state.current.paper_slug === item.paper_slug &&
@@ -99,7 +122,9 @@
       }`;
       const tag = li.querySelector(".tag");
       tag.textContent = statusLabel(st);
-      tag.classList.add(st === "failed" ? "failed" : "pending");
+      tag.classList.add(
+        st === "failed" ? "failed" : st === "passed" ? "passed" : "pending"
+      );
       li.addEventListener("click", () => openItem(item.paper_slug, item.table_id));
       ul.appendChild(li);
     }
@@ -228,8 +253,14 @@
     renderQueue();
   }
 
+  function queueUrl(path) {
+    const f = state.statusFilter || "todo";
+    const sep = path.includes("?") ? "&" : "?";
+    return `${path}${sep}status=${encodeURIComponent(f)}`;
+  }
+
   async function refreshQueue() {
-    const data = await api("/api/review/queue");
+    const data = await api(queueUrl("/api/review/queue"));
     state.stats = data.stats;
     state.queue = data.queue || [];
     renderStats(data.stats);
@@ -254,9 +285,9 @@
   async function loadNext(after) {
     try {
       showLoading(true, "加载队列…");
-      let url = "/api/review/next";
+      let url = queueUrl("/api/review/next");
       if (after?.paper_slug != null && after?.table_id != null) {
-        url += `?after_slug=${encodeURIComponent(after.paper_slug)}&after_table_id=${after.table_id}`;
+        url += `&after_slug=${encodeURIComponent(after.paper_slug)}&after_table_id=${after.table_id}`;
       }
       const data = await api(url);
       state.stats = data.stats;
@@ -264,7 +295,12 @@
       await refreshQueue();
       if (!data.item) {
         renderCurrent(null);
-        toast("全部校对完成 🎉", "ok");
+        toast(
+          state.statusFilter === "todo" || state.statusFilter === "all"
+            ? "全部校对完成 🎉"
+            : `「${filterLabel(state.statusFilter)}」筛选下无更多项`,
+          "ok"
+        );
       } else {
         renderCurrent(data.item);
       }
@@ -273,6 +309,36 @@
     } finally {
       showLoading(false);
     }
+  }
+
+  async function loadAdjacent(delta) {
+    const q = state.queue || [];
+    if (!q.length) {
+      toast("当前筛选队列为空", "warn");
+      return;
+    }
+    let idx = -1;
+    if (state.current) {
+      idx = q.findIndex(
+        (x) =>
+          x.paper_slug === state.current.paper_slug &&
+          Number(x.table_id) === Number(state.current.table_id)
+      );
+    }
+    if (idx < 0) {
+      await openItem(q[0].paper_slug, q[0].table_id);
+      return;
+    }
+    const next = q[(idx + delta + q.length) % q.length];
+    if (
+      next.paper_slug === state.current.paper_slug &&
+      Number(next.table_id) === Number(state.current.table_id) &&
+      q.length === 1
+    ) {
+      toast("当前筛选仅 1 项", "warn");
+      return;
+    }
+    await openItem(next.paper_slug, next.table_id);
   }
 
   async function submitVerdict(status) {
@@ -295,15 +361,24 @@
 
       if (status === "passed") {
         toast("已通过，进入下一项", "ok");
-        if (res.next) {
+        // Prefer next in filtered queue after refresh
+        const q = state.queue || [];
+        const stillHere = q.find(
+          (x) =>
+            x.paper_slug === paper_slug && Number(x.table_id) === Number(table_id)
+        );
+        if (!stillHere && q.length) {
+          await openItem(q[0].paper_slug, q[0].table_id);
+        } else if (res.next) {
           renderCurrent(res.next);
+        } else if (q.length) {
+          await openItem(q[0].paper_slug, q[0].table_id);
         } else {
           renderCurrent(null);
           toast("队列已空，全部完成", "ok");
         }
       } else if (status === "failed") {
         toast("已标为不通过，可选择策略重新提取", "warn");
-        // Stay on item so user can reextract
         await openItem(paper_slug, table_id);
       } else {
         if (res.next) renderCurrent(res.next);
@@ -339,6 +414,13 @@
     }
   }
 
+  function setStatusFilter(f) {
+    const allowed = new Set(["todo", "pending", "failed", "passed", "all"]);
+    state.statusFilter = allowed.has(f) ? f : "todo";
+    syncFilterChips();
+    loadNext();
+  }
+
   function bind() {
     $("btn-pass").addEventListener("click", () => submitVerdict("passed"));
     $("btn-fail").addEventListener("click", () => submitVerdict("failed"));
@@ -348,10 +430,20 @@
     });
     $("btn-reextract").addEventListener("click", doReextract);
 
+    $("queue-filter-chips")?.addEventListener("click", (e) => {
+      const btn = e.target.closest(".chip");
+      if (!btn || !btn.dataset.filter) return;
+      if (btn.dataset.filter === state.statusFilter) return;
+      setStatusFilter(btn.dataset.filter);
+    });
+
     document.addEventListener("keydown", (e) => {
       if (e.target && ["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName))
         return;
-      if (e.key === "y" || e.key === "Y" || e.key === "1") {
+      if (e.key === "Tab") {
+        e.preventDefault();
+        loadAdjacent(e.shiftKey ? -1 : 1);
+      } else if (e.key === "y" || e.key === "Y" || e.key === "1") {
         submitVerdict("passed");
       } else if (e.key === "n" || e.key === "N" || e.key === "2") {
         submitVerdict("failed");

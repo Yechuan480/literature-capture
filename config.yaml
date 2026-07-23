@@ -5,15 +5,15 @@ literature_root: null
 pdfs_subdir: pdfs
 
 ocr:
-  # auto | paddlex | img2table_tesseract | rapidocr
-  # auto：优先 PP-TableMagic(paddlex) → Tesseract → RapidOCR
+  # auto | img2table_tesseract | rapidocr | ai
+  # auto：优先 img2table+Tesseract → RapidOCR（不再默认走 Paddle）
   engine: auto
   lang: eng+chi_sim
   upscale_min_side: 1000
 
-# PP-TableMagic / PaddleX（预框检测 + 表格识别）
+# Paddle/PaddleX 已从默认提取路径移除；检测接口仍可按需启用（体积大，默认关闭）
 paddle:
-  enabled: true
+  enabled: false
   device: cpu
   detect_model: PicoDet_layout_1x_table
   recognize_pipeline: table_recognition_v2

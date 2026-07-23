@@ -25,6 +25,14 @@
             />
             <button type="button" id="btn-refresh" title="刷新列表">刷新</button>
           </div>
+          <div class="filter-chips" id="paper-filter-chips" role="group" aria-label="校对状态筛选">
+            <button type="button" class="chip active" data-filter="all" title="全部文献">全部</button>
+            <button type="button" class="chip" data-filter="failed" title="含未通过表格">未通过</button>
+            <button type="button" class="chip" data-filter="pending" title="含待校对表格">待校对</button>
+            <button type="button" class="chip" data-filter="passed" title="含已通过表格">已通过</button>
+            <button type="button" class="chip" data-filter="unextracted" title="含未提取截图">未提取</button>
+            <button type="button" class="chip" data-filter="todo" title="待校对或未通过">待办</button>
+          </div>
           <div class="toolbar-meta">
             <span class="badge" id="ocr-badge">OCR: …</span>
             <span class="hint" id="paper-count"></span>
@@ -161,7 +169,7 @@
           </div>
           <p class="hint" id="extract-paper-hint">本篇: —</p>
           <div class="capture-actions">
-            <span class="hint">快捷键：←/→ 翻页 · T/Shift+T 跳 Table · R/Shift+R 旋转 · Esc 取消框选</span>
+            <span class="hint">快捷键：Tab/Shift+Tab 下/上一篇 · ←/→ 翻页 · T/Shift+T 跳 Table · R/Shift+R 旋转 · Esc 取消框选</span>
           </div>
         </div>
 
