@@ -370,13 +370,50 @@
         cb.checked = !cb.checked;
         cb.dispatchEvent(new Event("change", { bubbles: true }));
       });
-      row.querySelector(".t-title").textContent = it.title || "（无标题）";
-      const metaBits = [];
-      if (it.authors) metaBits.push(it.authors);
-      if (it.doi) metaBits.push(it.doi);
-      if (it.filename) metaBits.push(it.filename);
-      if (it.error) metaBits.push(it.error);
-      row.querySelector(".t-meta").textContent = metaBits.join(" · ") || it.link || "";
+      const titleEl = row.querySelector(".t-title");
+      const title = it.title || "（无标题）";
+      const link = (it.link || "").trim();
+      if (link) {
+        titleEl.innerHTML = "";
+        const a = document.createElement("a");
+        a.className = "t-link";
+        a.href = link;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = title;
+        a.title = link;
+        a.addEventListener("click", (e) => e.stopPropagation());
+        titleEl.appendChild(a);
+      } else {
+        titleEl.textContent = title;
+      }
+      const metaEl = row.querySelector(".t-meta");
+      metaEl.innerHTML = "";
+      if (link) {
+        const la = document.createElement("a");
+        la.className = "t-url";
+        la.href = link;
+        la.target = "_blank";
+        la.rel = "noopener noreferrer";
+        la.textContent = link;
+        la.title = link;
+        la.addEventListener("click", (e) => e.stopPropagation());
+        metaEl.appendChild(la);
+      }
+      const extra = [];
+      if (it.authors) extra.push(it.authors);
+      if (it.doi) extra.push(it.doi);
+      if (it.filename) extra.push(it.filename);
+      if (it.error) extra.push(it.error);
+      if (it.source_subject) extra.push(it.source_subject);
+      if (extra.length) {
+        const sp = document.createElement("span");
+        sp.className = "t-extra";
+        sp.textContent = (link ? " · " : "") + extra.join(" · ");
+        metaEl.appendChild(sp);
+      } else if (!link) {
+        metaEl.textContent = "（无链接）";
+      }
       row.querySelector(".t-status").textContent = ST_LABEL[st] || st;
       if (!canCheck) row.classList.add("is-locked");
       root.appendChild(row);

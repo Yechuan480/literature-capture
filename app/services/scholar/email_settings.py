@@ -25,7 +25,8 @@ def _defaults() -> dict[str, Any]:
         "password": "",
         "folder": "INBOX",
         "ssl": True,
-        "sender_filter": "scholaralerts@google.com",
+        # Match Google 学术搜索快讯 (noreply address; IMAP SEARCH uses ASCII local-part)
+        "sender_filter": "scholaralerts-noreply@google.com",
     }
 
 

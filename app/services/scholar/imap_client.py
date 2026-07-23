@@ -196,14 +196,51 @@ def test_connection() -> dict[str, Any]:
             pool.shutdown(wait=False)
 
 
+# ASCII-safe FROM fragments for IMAP SEARCH (no non-ASCII SUBJECT — Gmail/imaplib
+# often fail with "'ascii' codec can't encode characters").
+_SCHOLAR_FROM_FRAGMENTS = (
+    "scholaralerts-noreply@google.com",
+    "scholaralerts@google.com",
+    "scholaralerts",
+)
+
+
+def _is_scholar_alert_mail(frm: str, subj: str, sender_filter: str = "") -> bool:
+    """
+    Keep only Google 学术搜索快讯 (CN Scholar Alerts) style messages.
+    Match From display name / address, optional user sender_filter, or subject cues.
+    """
+    frm = frm or ""
+    subj = subj or ""
+    blob = f"{frm} {subj}"
+    low = blob.lower()
+    # Primary: CN product name in From / body header area
+    if "学术搜索快讯" in blob or "google 学术搜索快讯" in low:
+        return True
+    # EN / address variants
+    if "scholaralerts" in low or "scholar alerts" in low:
+        return True
+    if "scholaralerts-noreply@google.com" in low or "scholaralerts@google.com" in low:
+        return True
+    sf = (sender_filter or "").strip().lower()
+    if sf and sf in low:
+        return True
+    # Subject of real alerts: "{query} - 新的结果" / "new results"
+    if re.search(r"新的结果|新引用|new results|new citations", subj, re.I):
+        if "scholar" in low or "google" in low or "学术" in blob:
+            return True
+    return False
+
+
 def fetch_recent_messages(
     *,
     days: int = 2,
     limit: int = 40,
 ) -> list[dict[str, Any]]:
     """
-    Fetch recent messages likely from Scholar Alerts.
-    Returns list of {message_id, subject, from, date, body_html, uid}.
+    Fetch recent Google 学术搜索快讯 mails.
+    Returns list of {message_id, subject, from, date, body, uid}.
+    IMAP SEARCH uses ASCII-only FROM/SINCE; final filter is client-side on From/Subject.
     """
     cfg = load_email_settings(force=True)
     host = (cfg.get("host") or "").strip()
@@ -212,7 +249,7 @@ def fetch_recent_messages(
     password = (cfg.get("password") or "").strip()
     folder = (cfg.get("folder") or "INBOX").strip() or "INBOX"
     use_ssl = bool(cfg.get("ssl", True))
-    sender = (cfg.get("sender_filter") or "scholaralerts@google.com").strip().lower()
+    sender = (cfg.get("sender_filter") or "scholaralerts-noreply@google.com").strip()
     if not host or not user or not password:
         raise RuntimeError("邮箱未配置完整")
 
@@ -226,16 +263,31 @@ def fetch_recent_messages(
         if typ != "OK":
             raise RuntimeError(f"无法打开文件夹 {folder}")
 
-        # Prefer SINCE + FROM; NEVER fall back to SEARCH ALL on huge boxes
+        # Prefer SINCE + FROM; NEVER fall back to SEARCH ALL on huge boxes.
+        # Do not put Chinese in IMAP criteria (ascii encode errors).
         from datetime import date, timedelta
 
         since = (date.today() - timedelta(days=max(0, days))).strftime("%d-%b-%Y")
-        attempts = []
-        if sender:
-            attempts.append(f'(FROM "{sender}" SINCE {since})')
-            attempts.append(f'(FROM "{sender}")')
+        # Build ASCII FROM candidates: user filter if ASCII, plus known Scholar senders
+        from_bits: list[str] = []
+        if sender and all(ord(c) < 128 for c in sender):
+            # Use local-part or full address for broader match
+            from_bits.append(sender)
+            if "@" in sender:
+                local = sender.split("@", 1)[0]
+                if local and local not in from_bits:
+                    from_bits.append(local)
+        for frag in _SCHOLAR_FROM_FRAGMENTS:
+            if frag not in from_bits:
+                from_bits.append(frag)
+
+        attempts: list[str] = []
+        for frag in from_bits:
+            attempts.append(f'(FROM "{frag}" SINCE {since})')
+        for frag in from_bits[:3]:
+            attempts.append(f'(FROM "{frag}")')
         attempts.append(f"(SINCE {since})")
-        # last resort: recent window only via UID — still avoid bare ALL
+        # last resort: recent window only — still avoid bare ALL
         attempts.append("RECENT")
         attempts.append("UNSEEN")
 
@@ -253,16 +305,19 @@ def fetch_recent_messages(
                 continue
         if not ids:
             # Final fallback: take the last `limit` sequence numbers without SEARCH ALL
-            # by probing STATUS count then FETCH range
             count = _folder_message_count(M, folder) or 0
             if count > 0:
                 start = max(1, count - limit + 1)
                 ids = [str(i).encode() for i in range(start, count + 1)]
             elif last_err:
                 raise RuntimeError(f"邮件搜索失败：{last_err}")
-        ids = ids[-limit:] if len(ids) > limit else ids
+        # Fetch a wider window then filter client-side (many non-alert mails in SINCE)
+        fetch_cap = max(limit * 4, 80)
+        ids = ids[-fetch_cap:] if len(ids) > fetch_cap else ids
 
         for mid in reversed(ids):  # newest first
+            if len(out) >= limit:
+                break
             try:
                 typ, msg_data = M.fetch(mid, "(RFC822)")
                 if typ != "OK" or not msg_data:
@@ -277,6 +332,8 @@ def fetch_recent_messages(
                 msg = email.message_from_bytes(raw)
                 subj = _decode_header(msg.get("Subject"))
                 frm = _decode_header(msg.get("From"))
+                if not _is_scholar_alert_mail(frm, subj, sender_filter=sender):
+                    continue
                 date_s = msg.get("Date") or ""
                 date_iso = ""
                 try:
@@ -285,13 +342,9 @@ def fetch_recent_messages(
                 except Exception:
                     date_iso = date_s
                 body = _body_text(msg)
-                # soft filter if sender_filter loose
-                blob = f"{frm} {subj}".lower()
-                if sender and sender not in blob and "scholar" not in blob:
-                    # still allow if subject looks like alert
-                    if not re.search(r"scholar|alert|学术|新结果|新引用", subj, re.I):
-                        continue
-                msgid = (msg.get("Message-ID") or "").strip() or f"imap-{mid.decode() if isinstance(mid, bytes) else mid}"
+                msgid = (msg.get("Message-ID") or "").strip() or (
+                    f"imap-{mid.decode() if isinstance(mid, bytes) else mid}"
+                )
                 out.append(
                     {
                         "message_id": msgid,

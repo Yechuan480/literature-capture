@@ -145,12 +145,38 @@
   line-height: 1.35;
 }
 
+.today-item .t-title a.t-link {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.today-item .t-title a.t-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 .today-item .t-meta {
   color: var(--muted);
   font-size: 0.7rem;
   margin-top: 0.2rem;
   line-height: 1.35;
-  word-break: break-word;
+  word-break: break-all;
+}
+
+.today-item .t-meta a.t-url {
+  color: var(--accent);
+  text-decoration: none;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.66rem;
+}
+
+.today-item .t-meta a.t-url:hover {
+  text-decoration: underline;
+}
+
+.today-item .t-meta .t-extra {
+  color: var(--muted);
 }
 
 .today-item .t-status {

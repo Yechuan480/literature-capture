@@ -361,10 +361,14 @@
               <input
                 type="text"
                 id="em-sender"
-                placeholder="scholaralerts@google.com"
+                placeholder="scholaralerts-noreply@google.com"
                 spellcheck="false"
               />
             </label>
+            <p class="field-hint" style="margin:0;font-size:0.72rem;color:var(--muted);line-height:1.4">
+              默认只收「Google 学术搜索快讯」（From 含 学术搜索快讯 /
+              scholaralerts）。IMAP 搜索用 ASCII 地址，中文名在本地再过滤。
+            </p>
             <label class="field-check">
               <input type="checkbox" id="em-ssl" checked /> SSL
             </label>
@@ -652,7 +656,8 @@
           $("em-port").value = em.port || 993;
           $("em-user").value = em.user || "";
           $("em-folder").value = em.folder || "INBOX";
-          $("em-sender").value = em.sender_filter || "scholaralerts@google.com";
+          $("em-sender").value =
+            em.sender_filter || "scholaralerts-noreply@google.com";
           $("em-ssl").checked = em.ssl !== false;
           $("em-password").placeholder = em.password_set
             ? "已保存密码（留空保持不变）"
